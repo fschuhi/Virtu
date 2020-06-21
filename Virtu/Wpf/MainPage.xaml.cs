@@ -30,12 +30,15 @@ namespace Jellyfish.Virtu
                 _machine.Services.AddService(typeof(AudioService), _audioService);
                 _machine.Services.AddService(typeof(VideoService), _videoService);
 
+                _memoryWindow = new MemoryWindow(_machine);
+
                 Loaded += (sender, e) => _machine.Start();
                 CompositionTarget.Rendering += OnCompositionTargetRendering;
                 Application.Current.Exit += (sender, e) => _machine.Stop();
 
                 _disk1Button.Click += (sender, e) => OnDiskButtonClick(0);
                 _disk2Button.Click += (sender, e) => OnDiskButtonClick(1);
+                _memoryButton.Click += (sender, e) => OnMemoryButtonClick();
             }
         }
 
@@ -62,17 +65,40 @@ namespace Jellyfish.Virtu
             _keyboardService.Update();
             _gamePortService.Update();
             _videoService.Update();
+
+            long time = DateTime.UtcNow.Ticks;
+            if (time - _lastTime >= TimeSpan.TicksPerSecond)
+            {
+                _lastTime = time;
+                long nowCycles = _machine.Cpu.Cycles;
+                double cycles = nowCycles - _lastCycles;
+                _lastCycles = nowCycles;
+
+                _speedText.Text = String.Format("{0:0.000} MHz", Math.Round((cycles / 1000000), 3));
+            }
         }
 
         private void OnDiskButtonClick(int drive)
         {
-            var dialog = new OpenFileDialog() { Filter = "Disk Files (*.do;*.dsk;*.nib;*.po)|*.do;*.dsk;*.nib;*.po|All Files (*.*)|*.*" };
+            var dialog = new OpenFileDialog() { Filter = "Disk Files (*.dsk;*.nib;*.2mg;*.po;*.do)|*.dsk;*.nib;*.2mg;*.po;*.do|All Files (*.*)|*.*" };
             bool? result = dialog.ShowDialog();
             if (result.HasValue && result.Value)
             {
                 _machine.Pause();
                 StorageService.LoadFile(dialog.FileName, stream => _machine.BootDiskII.Drives[drive].InsertDisk(dialog.FileName, stream, false));
                 _machine.Unpause();
+            }
+        }
+
+        private void OnMemoryButtonClick()
+        {
+            if (_memoryWindow.Visibility == Visibility.Visible)
+            {
+                _memoryWindow.Hide();
+            }
+            else
+            {
+                _memoryWindow.Show();
             }
         }
 
@@ -84,5 +110,10 @@ namespace Jellyfish.Virtu
         private GamePortService _gamePortService;
         private AudioService _audioService;
         private VideoService _videoService;
+
+        private long _lastCycles;
+        private long _lastTime;
+
+        private MemoryWindow _memoryWindow;
     }
 }

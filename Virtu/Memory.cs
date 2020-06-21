@@ -10,7 +10,28 @@ namespace Jellyfish.Virtu
 {
     public enum MonitorType { Unknown, Standard, Enhanced };
 
-    public sealed partial class Memory : MachineComponent
+    [Flags]
+    public enum DebugFlags : long
+    {
+        None = 0,
+        Opcode = 1 << 0,
+        Breakpoint = 1 << 1
+    }
+
+    public struct DebugDatum
+    {
+        public long ReadCount;
+        public long LastReadCycle;
+        public int LastReadFrom;
+        public long WriteCount;
+        public long LastWriteCycle;
+        public int LastWriteFrom;
+        public long ExecCount;
+        public long LastExecCycle;
+        public DebugFlags Flags;
+    }
+
+    public partial class Memory : MachineComponent
     {
         public Memory(Machine machine) : 
             base(machine)
@@ -218,20 +239,124 @@ namespace Jellyfish.Virtu
             while ((startAddress >= 0) && (endAddress >= 0));
         }
 
+        public void DebugReset()
+        {
+            MaxExecCount = 0;
+            MaxReadCount = 0;
+            MaxWriteCount = 0;
+            for (int address = 0; address < 0x10000; ++address)
+            {
+                DebugInfo[address].ReadCount = 0;
+                DebugInfo[address].LastReadCycle = 0;
+                DebugInfo[address].LastReadFrom = 0;
+                DebugInfo[address].WriteCount = 0;
+                DebugInfo[address].LastWriteCycle = 0;
+                DebugInfo[address].LastWriteFrom = 0;
+                DebugInfo[address].ExecCount = 0;
+                DebugInfo[address].LastExecCycle = 0;
+                DebugInfo[address].Flags = DebugFlags.None;
+            }
+        }
+
         #region Core Read & Write
+        private void ReadUpdateDatum(int address)
+        {
+            var count = DebugInfo[address].ReadCount++;
+            if (count > MaxReadCount)
+                MaxReadCount = count;
+            DebugInfo[address].LastReadCycle = Machine.Cpu.Cycles;
+            DebugInfo[address].LastReadFrom = DebugExecutingOpcodeRPC;
+        }
+
         public int Read(int address)
+        {
+            ReadUpdateDatum(address);
+            return ReadBanked(address);
+    }
+
+        public int ReadBanked(int address)
         {
             int region = PageRegion[address >> 8];
             return ((address & 0xF000) != 0xC000) ? _regionRead[region][address - RegionBaseAddress[region]] : ReadIoRegionC0CF(address);
         }
 
+        public int ReadOpcode(int address)
+        {
+            DebugExecutingOpcodeRPC = address;
+            var count = DebugInfo[address].ExecCount++;
+            if (count > MaxExecCount)
+                MaxExecCount = count;
+            DebugInfo[address].LastExecCycle = Machine.Cpu.Cycles;
+            DebugInfo[address].Flags |= DebugFlags.Opcode;
+
+            if (DebugInfo[address].Flags.HasFlag(DebugFlags.Breakpoint))
+                Machine.Pause();
+
+            return ReadBanked(address);
+        }
+
+        public void ClearBreakpoint(int address)
+        {
+            DebugInfo[address].Flags &= ~DebugFlags.Breakpoint;
+        }
+
+        public void SetBreakpoint(int address)
+        {
+            DebugInfo[address].Flags |= DebugFlags.Breakpoint;
+        }
+
+        public int ReadOperand(int address)
+        {
+            var count = DebugInfo[address].ExecCount++;
+            if (count > MaxExecCount)
+                MaxExecCount = count;
+            DebugInfo[address].LastExecCycle = Machine.Cpu.Cycles;
+            DebugInfo[address].Flags &= ~DebugFlags.Opcode;
+
+            return ReadBanked(address);
+        }
+
+        public int ReadDebug(int address)
+        {
+            if (address >= 0xC000 && address < 0xD000)
+            {
+                // avoid side-effects
+                return 0; // TODO: return C100...CFFF
+            }
+
+            return ReadBanked(address);
+        }
+
         public int ReadZeroPage(int address)
         {
+            ReadUpdateDatum(address);
+
             return _zeroPage[address];
+        }
+
+        public int ReadZeroMain(int address)
+        {
+            return _ramMainRegion0001[address];
+        }
+
+        public int ReadZeroAux(int address)
+        {
+            return _ramAuxRegion0001[address];
+        }
+
+        private void WriteUpdateDatum(int address)
+        {
+            var count = DebugInfo[address].WriteCount++;
+            if (count > MaxWriteCount)
+                MaxWriteCount = count;
+            DebugInfo[address].LastWriteCycle = Machine.Cpu.Cycles;
+            DebugInfo[address].LastWriteFrom = DebugExecutingOpcodeRPC;
         }
 
         public void Write(int address, int data)
         {
+            WriteUpdateDatum(address);
+
             int region = PageRegion[address >> 8];
             if (_writeRegion[region] == null)
             {
@@ -245,6 +370,8 @@ namespace Jellyfish.Virtu
 
         public void WriteZeroPage(int address, int data)
         {
+            WriteUpdateDatum(address);
+
             _zeroPage[address] = (byte)data;
         }
         #endregion
@@ -1719,20 +1846,26 @@ namespace Jellyfish.Virtu
         private byte[][] _regionWrite = new byte[RegionCount][];
         private Action<int, byte>[] _writeRegion = new Action<int, byte>[RegionCount];
 
-        private byte[] _ramMainRegion0001 = new byte[0x0200];
-        private byte[] _ramMainRegion02BF = new byte[0xBE00];
-        private byte[] _ramMainBank1RegionD0DF = new byte[0x1000];
-        private byte[] _ramMainBank2RegionD0DF = new byte[0x1000];
-        private byte[] _ramMainRegionE0FF = new byte[0x2000];
-        private byte[] _ramAuxRegion0001 = new byte[0x0200];
-        private byte[] _ramAuxRegion02BF = new byte[0xBE00];
-        private byte[] _ramAuxBank1RegionD0DF = new byte[0x1000];
-        private byte[] _ramAuxBank2RegionD0DF = new byte[0x1000];
-        private byte[] _ramAuxRegionE0FF = new byte[0x2000];
+        public byte[] _ramMainRegion0001 = new byte[0x0200];
+        public byte[] _ramMainRegion02BF = new byte[0xBE00];
+        public byte[] _ramMainBank1RegionD0DF = new byte[0x1000];
+        public byte[] _ramMainBank2RegionD0DF = new byte[0x1000];
+        public byte[] _ramMainRegionE0FF = new byte[0x2000];
+        public byte[] _ramAuxRegion0001 = new byte[0x0200];
+        public byte[] _ramAuxRegion02BF = new byte[0xBE00];
+        public byte[] _ramAuxBank1RegionD0DF = new byte[0x1000];
+        public byte[] _ramAuxBank2RegionD0DF = new byte[0x1000];
+        public byte[] _ramAuxRegionE0FF = new byte[0x2000];
 
         private byte[] _romExternalRegionC1CF = new byte[0x0F00];
         private byte[] _romInternalRegionC1CF = new byte[0x0F00];
         private byte[] _romRegionD0DF = new byte[0x1000];
         private byte[] _romRegionE0FF = new byte[0x2000];
+
+        private int DebugExecutingOpcodeRPC;
+        public DebugDatum[] DebugInfo = new DebugDatum[0x10000];
+        public long MaxExecCount = 0;
+        public long MaxReadCount = 0;
+        public long MaxWriteCount = 0;
     }
 }

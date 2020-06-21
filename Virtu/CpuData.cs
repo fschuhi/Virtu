@@ -4,7 +4,7 @@ namespace Jellyfish.Virtu
 {
     public partial class Cpu
     {
-        private const int OpCodeCount = 256;
+        public const int OpCodeCount = 256;
 
         private readonly Action[] ExecuteOpCode65N02;
         private readonly Action[] ExecuteOpCode65C02;

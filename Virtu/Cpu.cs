@@ -2,6 +2,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO;
+using System.Text;
 
 namespace Jellyfish.Virtu
 {
@@ -156,13 +157,14 @@ namespace Jellyfish.Virtu
             Multiplier = 1;
 
             RS = 0xFF;
+            RP = PR | PB;
         }
 
         public override void Reset()
         {
             RS = (RS - 3) & 0xFF; // [4-14]
             RPC = _memory.ReadRomRegionE0FF(0xFFFC) | (_memory.ReadRomRegionE0FF(0xFFFD) << 8);
-            RP |= (PB | PI);
+            RP |= PI; // [4-14]
             if (Is65C02) // [C-10]
             {
                 RP &= ~PD;
@@ -184,7 +186,7 @@ namespace Jellyfish.Virtu
             RX = reader.ReadInt32();
             RY = reader.ReadInt32();
             RS = reader.ReadInt32();
-            RP = reader.ReadInt32();
+            RP = reader.ReadInt32() | (PR | PB);
             RPC = reader.ReadInt32();
         }
 
@@ -213,13 +215,38 @@ namespace Jellyfish.Virtu
                 RA, RX, RY, RP, RS, RPC, EA, CC);
         }
 
+        //private System.IO.StreamWriter runFile = new System.IO.StreamWriter(@"C:\Users\Public\VirtuRun.txt", false);
+
+        //private void writeRunFile(int opcode)
+        //{
+        //    if (
+        //        (RPC > 0x0500)
+        //        &&
+        //        (RPC < 0x0600)
+        //        )
+        //    {
+        //        runFile.WriteLine("{0:X4}-{1:X2} P={2:X2}", RPC, OpCode, RP);
+        //    }
+        //}
+
         public int Execute()
         {
             CC = 0;
-            OpCode = _memory.Read(RPC);
+            OpCode = _memory.ReadOpcode(RPC);
+            Profiler[OpCode]++;
+
+            //if (RPC == 0x4557)
+            //{
+            //    _memory.Exsourcise(0x0100, 0x06FF, @"C:\Dev\Emulators\\Exsourcist\Source.01-07");
+            //}
+
+            //writeRunFile(OpCode);
+
             RPC = (RPC + 1) & 0xFFFF;
             _executeOpCode[OpCode]();
             Cycles += CC;
+
+            //System.Diagnostics.Debug.WriteLine("      " + ToString());
 
             return CC;
         }
@@ -227,68 +254,68 @@ namespace Jellyfish.Virtu
         #region Core Operand Actions
         private void GetAddressAbs() // abs
         {
-            EA = _memory.Read(RPC) | (_memory.Read(RPC + 1) << 8);
+            EA = _memory.ReadOperand(RPC) | (_memory.ReadOperand(RPC + 1) << 8);
             RPC = (RPC + 2) & 0xFFFF;
         }
 
         private void GetAddressAbsX() // abs, x
         {
-            EA = (_memory.Read(RPC) + RX + (_memory.Read(RPC + 1) << 8)) & 0xFFFF;
+            EA = (_memory.ReadOperand(RPC) + RX + (_memory.ReadOperand(RPC + 1) << 8)) & 0xFFFF;
             RPC = (RPC + 2) & 0xFFFF;
         }
 
         private void GetAddressAbsXCC() // abs, x
         {
-            int ea = _memory.Read(RPC) + RX;
-            EA = (ea + (_memory.Read(RPC + 1) << 8)) & 0xFFFF;
+            int ea = _memory.ReadOperand(RPC) + RX;
+            EA = (ea + (_memory.ReadOperand(RPC + 1) << 8)) & 0xFFFF;
             RPC = (RPC + 2) & 0xFFFF;
             CC += (ea >> 8);
         }
 
         private void GetAddressAbsY() // abs, y
         {
-            EA = (_memory.Read(RPC) + RY + (_memory.Read(RPC + 1) << 8)) & 0xFFFF;
+            EA = (_memory.ReadOperand(RPC) + RY + (_memory.ReadOperand(RPC + 1) << 8)) & 0xFFFF;
             RPC = (RPC + 2) & 0xFFFF;
         }
 
         private void GetAddressAbsYCC() // abs, y
         {
-            int ea = _memory.Read(RPC) + RY;
-            EA = (ea + (_memory.Read(RPC + 1) << 8)) & 0xFFFF;
+            int ea = _memory.ReadOperand(RPC) + RY;
+            EA = (ea + (_memory.ReadOperand(RPC + 1) << 8)) & 0xFFFF;
             RPC = (RPC + 2) & 0xFFFF;
             CC += (ea >> 8);
         }
 
         private void GetAddressZpg() // zpg
         {
-            EA = _memory.Read(RPC);
+            EA = _memory.ReadOperand(RPC);
             RPC = (RPC + 1) & 0xFFFF;
         }
 
         private void GetAddressZpgInd() // (zpg)
         {
-            int zp = _memory.Read(RPC);
+            int zp = _memory.ReadOperand(RPC);
             EA = _memory.ReadZeroPage(zp) | (_memory.ReadZeroPage((zp + 1) & 0xFF) << 8);
             RPC = (RPC + 1) & 0xFFFF;
         }
 
         private void GetAddressZpgIndX() // (zpg, x)
         {
-            int zp = (_memory.Read(RPC) + RX) & 0xFF;
+            int zp = (_memory.ReadOperand(RPC) + RX) & 0xFF;
             EA = _memory.ReadZeroPage(zp) | (_memory.ReadZeroPage((zp + 1) & 0xFF) << 8);
             RPC = (RPC + 1) & 0xFFFF;
         }
 
         private void GetAddressZpgIndY() // (zpg), y
         {
-            int zp = _memory.Read(RPC);
+            int zp = _memory.ReadOperand(RPC);
             EA = (_memory.ReadZeroPage(zp) + RY + (_memory.ReadZeroPage((zp + 1) & 0xFF) << 8)) & 0xFFFF;
             RPC = (RPC + 1) & 0xFFFF;
         }
 
         private void GetAddressZpgIndYCC() // (zpg), y
         {
-            int zp = _memory.Read(RPC);
+            int zp = _memory.ReadOperand(RPC);
             int ea = _memory.ReadZeroPage(zp) + RY;
             EA = (ea + (_memory.ReadZeroPage((zp + 1) & 0xFF) << 8)) & 0xFFFF;
             RPC = (RPC + 1) & 0xFFFF;
@@ -297,13 +324,13 @@ namespace Jellyfish.Virtu
 
         private void GetAddressZpgX() // zpg, x
         {
-            EA = (_memory.Read(RPC) + RX) & 0xFF;
+            EA = (_memory.ReadOperand(RPC) + RX) & 0xFF;
             RPC = (RPC + 1) & 0xFFFF;
         }
 
         private void GetAddressZpgY() // zpg, y
         {
-            EA = (_memory.Read(RPC) + RY) & 0xFF;
+            EA = (_memory.ReadOperand(RPC) + RY) & 0xFF;
             RPC = (RPC + 1) & 0xFFFF;
         }
 
@@ -337,7 +364,7 @@ namespace Jellyfish.Virtu
 
         private int ReadImm() // imm
         {
-            int data = _memory.Read(RPC);
+            int data = _memory.ReadOperand(RPC);
             RPC = (RPC + 1) & 0xFFFF;
 
             return data;
@@ -511,7 +538,7 @@ namespace Jellyfish.Virtu
             if ((RP & PC) == 0x0)
             {
                 int rpc = (RPC + 1) & 0xFFFF;
-                RPC = (RPC + 1 + (sbyte)_memory.Read(RPC)) & 0xFFFF;
+                RPC = (RPC + 1 + (sbyte)_memory.ReadOperand(RPC)) & 0xFFFF;
                 CC += cc + 1 + (((RPC ^ rpc) >> 8) & 0x01);
             }
             else
@@ -526,7 +553,7 @@ namespace Jellyfish.Virtu
             if ((RP & PC) != 0x0)
             {
                 int rpc = (RPC + 1) & 0xFFFF;
-                RPC = (RPC + 1 + (sbyte)_memory.Read(RPC)) & 0xFFFF;
+                RPC = (RPC + 1 + (sbyte)_memory.ReadOperand(RPC)) & 0xFFFF;
                 CC += cc + 1 + (((RPC ^ rpc) >> 8) & 0x01);
             }
             else
@@ -541,7 +568,7 @@ namespace Jellyfish.Virtu
             if ((RP & PZ) != 0x0)
             {
                 int rpc = (RPC + 1) & 0xFFFF;
-                RPC = (RPC + 1 + (sbyte)_memory.Read(RPC)) & 0xFFFF;
+                RPC = (RPC + 1 + (sbyte)_memory.ReadOperand(RPC)) & 0xFFFF;
                 CC += cc + 1 + (((RPC ^ rpc) >> 8) & 0x01);
             }
             else
@@ -568,7 +595,7 @@ namespace Jellyfish.Virtu
             if ((RP & PN) != 0x0)
             {
                 int rpc = (RPC + 1) & 0xFFFF;
-                RPC = (RPC + 1 + (sbyte)_memory.Read(RPC)) & 0xFFFF;
+                RPC = (RPC + 1 + (sbyte)_memory.ReadOperand(RPC)) & 0xFFFF;
                 CC += cc + 1 + (((RPC ^ rpc) >> 8) & 0x01);
             }
             else
@@ -583,7 +610,7 @@ namespace Jellyfish.Virtu
             if ((RP & PZ) == 0x0)
             {
                 int rpc = (RPC + 1) & 0xFFFF;
-                RPC = (RPC + 1 + (sbyte)_memory.Read(RPC)) & 0xFFFF;
+                RPC = (RPC + 1 + (sbyte)_memory.ReadOperand(RPC)) & 0xFFFF;
                 CC += cc + 1 + (((RPC ^ rpc) >> 8) & 0x01);
             }
             else
@@ -598,7 +625,7 @@ namespace Jellyfish.Virtu
             if ((RP & PN) == 0x0)
             {
                 int rpc = (RPC + 1) & 0xFFFF;
-                RPC = (RPC + 1 + (sbyte)_memory.Read(RPC)) & 0xFFFF;
+                RPC = (RPC + 1 + (sbyte)_memory.ReadOperand(RPC)) & 0xFFFF;
                 CC += cc + 1 + (((RPC ^ rpc) >> 8) & 0x01);
             }
             else
@@ -611,7 +638,7 @@ namespace Jellyfish.Virtu
         private void ExecuteBra(int cc)
         {
             int rpc = (RPC + 1) & 0xFFFF;
-            RPC = (RPC + 1 + (sbyte)_memory.Read(RPC)) & 0xFFFF;
+            RPC = (RPC + 1 + (sbyte)_memory.ReadOperand(RPC)) & 0xFFFF;
             CC += cc + 1 + (((RPC ^ rpc) >> 8) & 0x01);
         }
 
@@ -620,7 +647,7 @@ namespace Jellyfish.Virtu
             int rpc = (RPC + 1) & 0xFFFF; // [4-18]
             Push(rpc >> 8);
             Push(rpc & 0xFF);
-            Push(RP | PB);
+            Push(RP);
             RP |= PI;
             RPC = _memory.Read(0xFFFE) | (_memory.Read(0xFFFF) << 8);
             CC += cc;
@@ -631,7 +658,7 @@ namespace Jellyfish.Virtu
             if ((RP & PV) == 0x0)
             {
                 int rpc = (RPC + 1) & 0xFFFF;
-                RPC = (RPC + 1 + (sbyte)_memory.Read(RPC)) & 0xFFFF;
+                RPC = (RPC + 1 + (sbyte)_memory.ReadOperand(RPC)) & 0xFFFF;
                 CC += cc + 1 + (((RPC ^ rpc) >> 8) & 0x01);
             }
             else
@@ -646,7 +673,7 @@ namespace Jellyfish.Virtu
             if ((RP & PV) != 0x0)
             {
                 int rpc = (RPC + 1) & 0xFFFF;
-                RPC = (RPC + 1 + (sbyte)_memory.Read(RPC)) & 0xFFFF;
+                RPC = (RPC + 1 + (sbyte)_memory.ReadOperand(RPC)) & 0xFFFF;
                 CC += cc + 1 + (((RPC ^ rpc) >> 8) & 0x01);
             }
             else
@@ -773,8 +800,8 @@ namespace Jellyfish.Virtu
         {
             Push(RPC >> 8);
             Push(RPC & 0xFF);
-            Push(RP & ~PB);
-            RP |= PI;
+            Push(RP & ~PB); // [4-15]
+            RP |= PI; // [4-16]
             if (Is65C02) // [C-10]
             {
                 RP &= ~PD;
@@ -785,27 +812,27 @@ namespace Jellyfish.Virtu
 
         private void ExecuteJmpAbs(int cc) // jmp abs
         {
-            RPC = _memory.Read(RPC) | (_memory.Read(RPC + 1) << 8);
+            RPC = _memory.ReadOperand(RPC) | (_memory.ReadOperand(RPC + 1) << 8);
             CC += cc;
         }
 
         private void ExecuteJmpAbsInd65N02(int cc) // jmp (abs)
         {
-            int ea = _memory.Read(RPC) | (_memory.Read(RPC + 1) << 8);
+            int ea = _memory.ReadOperand(RPC) | (_memory.ReadOperand(RPC + 1) << 8);
             RPC = _memory.Read(ea) | (_memory.Read((ea & 0xFF00) | ((ea + 1) & 0x00FF)) << 8);
             CC += cc;
         }
 
         private void ExecuteJmpAbsInd65C02(int cc) // jmp (abs)
         {
-            int ea = _memory.Read(RPC) | (_memory.Read(RPC + 1) << 8);
+            int ea = _memory.ReadOperand(RPC) | (_memory.ReadOperand(RPC + 1) << 8);
             RPC = _memory.Read(ea) | (_memory.Read(ea + 1) << 8);
             CC += cc;
         }
 
         private void ExecuteJmpAbsIndX(int cc) // jmp (abs, x)
         {
-            int ea = (_memory.Read(RPC) + RX + (_memory.Read(RPC + 1) << 8)) & 0xFFFF;
+            int ea = (_memory.ReadOperand(RPC) + RX + (_memory.ReadOperand(RPC + 1) << 8)) & 0xFFFF;
             RPC = _memory.Read(ea) | (_memory.Read(ea + 1) << 8);
             CC += cc;
         }
@@ -813,7 +840,7 @@ namespace Jellyfish.Virtu
         private void ExecuteJsr(int cc) // jsr abs
         {
             int rpc = (RPC + 1) & 0xFFFF;
-            RPC = _memory.Read(RPC) | (_memory.Read(RPC + 1) << 8);
+            RPC = _memory.ReadOperand(RPC) | (_memory.ReadOperand(RPC + 1) << 8);
             Push(rpc >> 8);
             Push(rpc & 0xFF);
             CC += cc;
@@ -863,8 +890,8 @@ namespace Jellyfish.Virtu
         {
             Push(RPC >> 8);
             Push(RPC & 0xFF);
-            Push(RP & ~PB);
-            RP |= PI;
+            Push(RP & ~PB); // [4-15]
+            RP |= PI; // [4-16]
             if (Is65C02) // [C-10]
             {
                 RP &= ~PD;
@@ -899,7 +926,7 @@ namespace Jellyfish.Virtu
 
         private void ExecutePhp(int cc)
         {
-            Push(RP | PB); // [4-18]
+            Push(RP); // [4-18]
             CC += cc;
         }
 
@@ -3252,6 +3279,8 @@ namespace Jellyfish.Virtu
         public int CC { get; private set; }
         public int OpCode { get; private set; }
         public long Cycles { get; private set; }
+
+        public long[] Profiler = new long[OpCodeCount];
 
         private Memory _memory;
 

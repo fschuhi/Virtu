@@ -80,6 +80,16 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="..\MemoryDebug.cs">
+      <Link>Core\MemoryDebug.cs</Link>
+    </Compile>
+    <Compile Include="MemoryWindow.xaml.cs">
+      <DependentUpon>MemoryWindow.xaml</DependentUpon>
+    </Compile>
+    <Page Include="MemoryWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="MainPage.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
