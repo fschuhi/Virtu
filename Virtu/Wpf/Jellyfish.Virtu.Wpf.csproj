@@ -88,6 +88,9 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
+    <Compile Include="..\JoystickCard.cs">
+      <Link>Core\JoystickCard.cs</Link>
+    </Compile>
     <Compile Include="MainApp.xaml.cs">
       <DependentUpon>MainApp.xaml</DependentUpon>
       <SubType>Code</SubType>

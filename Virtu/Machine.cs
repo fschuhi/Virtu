@@ -31,6 +31,7 @@ namespace Jellyfish.Virtu
             Slot2 = emptySlot;
             Slot3 = emptySlot;
             Slot4 = emptySlot;
+            //Slot4 = new JoystickCard(this);
             Slot5 = emptySlot;
             Slot6 = new DiskIIController(this);
             Slot7 = emptySlot;

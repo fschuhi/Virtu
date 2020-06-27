@@ -1,13 +1,27 @@
 ﻿using System;
+using System.Diagnostics;
+using System.IO;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+using System.Threading;
+
+using Jellyfish.Library;
 
 namespace Jellyfish.Virtu.Services
 {
     public class GamePortService : MachineService
     {
-        public GamePortService(Machine machine) : 
+        public GamePortService(Machine machine) :
             base(machine)
         {
             Paddle0 = Paddle1 = Paddle2 = Paddle3 = 255; // not connected
+
+            _joystick[0] = new Joystick(0, true);
+        }
+
+        public void Close()
+        {
         }
 
         public virtual void Update() // main thread
@@ -47,6 +61,20 @@ namespace Jellyfish.Virtu.Services
                     }
                 }
             }
+
+            if (_joystick[0] != null && _joystick[0].Valid && _joystick[0].UpdateAxes())
+            {
+                Paddle0 = (int)(_joystick[0].GetXAxisAsPercent() * 255 / 100);
+                Paddle1 = (int)(_joystick[0].GetYAxisAsPercent() * 255 / 100);
+                if (_joystick[0].IsThumbstick2Enabled)
+                {
+                    Paddle2 = (int)(_joystick[0].GetZAxisAsPercent() * 255 / 100);
+                    Paddle3 = (int)(_joystick[0].GetRAxisAsPercent() * 255 / 100);
+                }
+
+                IsButton0Down = (_joystick[0].GetButtons() & 1) != 0;
+                IsButton1Down = (_joystick[0].GetButtons() & 2) != 0;
+           }
         }
 
         private void UpdateKey(int key, bool isActive, ref bool isKeyDown, ref bool wasKeyDown)
@@ -135,5 +163,7 @@ namespace Jellyfish.Virtu.Services
         private int _lastKey;
         private long _lastTime;
         private long _repeatTime;
+
+        private Joystick[] _joystick = new Joystick[2];
     }
 }
