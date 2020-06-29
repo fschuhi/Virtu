@@ -11,8 +11,9 @@
         <StackPanel Orientation="Horizontal">
             <Button x:Name="_disk1Button" Content="Disk 1" Focusable="False" IsTabStop="False" Margin="4,4,0,4" />
             <Button x:Name="_disk2Button" Content="Disk 2" Focusable="False" IsTabStop="False" Margin="4,4,0,4" />
-            <Button x:Name="_memoryButton" Content="Hey-Ray" Focusable="False" IsTabStop="False" Margin="4,4,0,4" />
+            <Button x:Name="_memoryButton" Content="Hex-Ray" Focusable="False" IsTabStop="False" Margin="4,4,0,4" />
             <TextBlock x:Name="_speedText" Text="0.000" Margin="4,0,4,0" FontFamily="Consolas" FontSize="12" Foreground="White" VerticalAlignment="Center" />
+            <TextBlock x:Name="_state" Text="running" Margin="4,0,4,0" FontFamily="Consolas" FontSize="12" Foreground="White" VerticalAlignment="Center" />
         </StackPanel>
         <jl:FrameRateCounter Margin="0,0,4,0" HorizontalAlignment="Right" VerticalAlignment="Center" />
         <Grid Grid.Row="1">
