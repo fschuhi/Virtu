@@ -1,38 +1,40 @@
 ﻿using System;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using System.Windows;
+using Jellyfish.Library;
 using Jellyfish.Virtu.Services;
 
-namespace Jellyfish.Virtu
-{
+namespace Jellyfish.Virtu {
     public enum MachineState { Stopped = 0, Starting, Running, Pausing, Paused, Stopping }
 
-    public sealed class Machine : IDisposable
-    {
-        public Machine()
-        {
-            Events = new MachineEvents();
+    public class Machine : IDisposable {
+        public Machine( MainPage mainPage ) {
+            MainPage = mainPage;
+
+            Events = new MachineEvents( this );
             Services = new MachineServices();
 
-            Cpu = new Cpu(this);
-            Memory = new Memory(this);
-            Keyboard = new Keyboard(this);
-            GamePort = new GamePort(this);
-            Cassette = new Cassette(this);
-            Speaker = new Speaker(this);
-            Video = new Video(this);
-            NoSlotClock = new NoSlotClock(this);
+            Cpu = new Cpu( this );
+            Memory = new Memory( this );
+            Keyboard = new Keyboard( this );
+            GamePort = new GamePort( this );
+            Cassette = new Cassette( this );
+            Speaker = new Speaker( this );
+            Video = new Video( this );
+            NoSlotClock = new NoSlotClock( this );
 
-            var emptySlot = new PeripheralCard(this);
+            var emptySlot = new PeripheralCard( this );
             Slot1 = emptySlot;
             Slot2 = emptySlot;
             Slot3 = emptySlot;
             Slot4 = emptySlot;
             Slot5 = emptySlot;
-            Slot6 = new DiskIIController(this);
+            Slot6 = new DiskIIController( this );
             Slot7 = emptySlot;
 
             Slots = new Collection<PeripheralCard> { null, Slot1, Slot2, Slot3, Slot4, Slot5, Slot6, Slot7 };
@@ -40,86 +42,103 @@ namespace Jellyfish.Virtu
 
             BootDiskII = Slots.OfType<DiskIIController>().Last();
 
-            Thread = new Thread(Run) { Name = "Machine" };
+            MachineThread = new Thread( RunMachineThread ) { Name = "Machine" };
         }
 
-        public void Dispose()
-        {
-            _pauseEvent.Close();
-            _unpauseEvent.Close();
+        public void Dispose() {
+            _pausedEvent.Close();
+            _unpausedEvent.Close();
         }
 
-        public void Reset()
-        {
-            foreach (var component in Components)
-            {
-                _debugService.WriteMessage("Resetting machine '{0}'", component.GetType().Name);
-                component.Reset();
-                //_debugService.WriteMessage("Reset machine '{0}'", component.GetType().Name);
+        private void DebugMessage( string format, params object[] args ) {
+            if (_debugService == null) {
+                // suppress the message
+                // we are probably before the machine thread has started
+            } else {
+                _debugService.WriteMessage( format, args );
             }
         }
 
-        [SuppressMessage("Microsoft.Globalization", "CA1303:Do not pass literals as localized parameters", MessageId = "Jellyfish.Virtu.Services.DebugService.WriteMessage(System.String)")]
-        public void Start()
-        {
+        public void Reset() {
+            foreach (var component in Components) {
+                DebugMessage( "Resetting machine '{0}'", component.GetType().Name );
+                component.Reset();
+                //DebugMessage("Reset machine '{0}'", component.GetType().Name);
+            }
+        }
+
+        public void Start() {
             _debugService = Services.GetService<DebugService>();
             _storageService = Services.GetService<StorageService>();
 
-            _debugService.WriteMessage("Starting machine");
+            DebugMessage( "Starting machine" );
             State = MachineState.Starting;
-            Thread.Start();
+            MachineThread.Start();
         }
 
-        [SuppressMessage("Microsoft.Globalization", "CA1303:Do not pass literals as localized parameters", MessageId = "Jellyfish.Virtu.Services.DebugService.WriteMessage(System.String)")]
-        public void Pause()
-        {
-            _debugService.WriteMessage("Pausing machine");
+        public void Pause() {
+            if (State != MachineState.Running) return;
+
+            DebugMessage( "Pausing machine" );
             State = MachineState.Pausing;
-            _pauseEvent.WaitOne();
-            State = MachineState.Paused;
-            _debugService.WriteMessage("Paused machine");
+
+            if (! IsInMachineThread()) {
+                DebugMessage( "waiting for Machine to signal Paused" );
+                _pausedEvent.WaitOne();
+                DebugMessage( "machine signaled Paused" );
+            }
         }
 
-        [SuppressMessage("Microsoft.Globalization", "CA1303:Do not pass literals as localized parameters", MessageId = "Jellyfish.Virtu.Services.DebugService.WriteMessage(System.String)")]
-        public void Unpause()
-        {
-            _debugService.WriteMessage("Running machine");
-            State = MachineState.Running;
-            _unpauseEvent.Set();
+        public void Unpause() {
+            // Machine starts Stopped, so make sure we can issue the initializing Unpause
+            if (State != MachineState.Paused && State != MachineState.Stopped) {
+                DebugMessage( "Unpause skipped (not in Paused or Stopped)" );
+                return;
+            } else {
+                DebugMessage( "signal Unpaused" );
+                _unpausedEvent.Set();
+            }
         }
 
-        [SuppressMessage("Microsoft.Globalization", "CA1303:Do not pass literals as localized parameters", MessageId = "Jellyfish.Virtu.Services.DebugService.WriteMessage(System.String)")]
-        public void Stop()
-        {
-            _debugService.WriteMessage("Stopping machine");
+        public void Stop() {
+            if (State == MachineState.Stopped) return;
+
+            DebugMessage( "Stopping machine" );
             State = MachineState.Stopping;
-            _unpauseEvent.Set();
-            if (Thread.IsAlive)
-            {
-                Thread.Join();
+
+            // machine might be paused, waiting to be unpaused
+            _unpausedEvent.Set();
+
+            // true if this thread has been started and has not terminated normally or aborted; otherwise, false.
+            if (MachineThread.IsAlive) {
+                // Blocks the calling thread until the thread represented by this instance terminates, while continuing to perform standard COM and SendMessage pumping.
+                MachineThread.Join();
             }
             State = MachineState.Stopped;
-            _debugService.WriteMessage("Stopped machine");
+            DebugMessage( "Stopped machine" );
         }
 
-        private void Initialize()
-        {
-            foreach (var component in Components)
-            {
-                _debugService.WriteMessage("Initializing machine '{0}'", component.GetType().Name);
+        private void Initialize() {
+            foreach (var component in Components) {
+                DebugMessage( "Initializing machine '{0}'", component.GetType().Name );
                 component.Initialize();
-                //_debugService.WriteMessage("Initialized machine '{0}'", component.GetType().Name);
+                //DebugMessage("Initialized machine '{0}'", component.GetType().Name);
             }
         }
 
-        private void LoadState()
-        {
-#if WINDOWS
+        public bool IsInMachineThread() {
+            return Thread.CurrentThread == MachineThread;
+        }
+
+        #region state mgmnt
+        private void LoadState() {
+            // #if WINDOWS
+#if BLA
             var args = Environment.GetCommandLineArgs();
             if (args.Length > 1)
-            {
-                string name = args[1];
-                Func<string, Action<Stream>, bool> loader = StorageService.LoadFile;
+                {
+                    string name = args[1];
+                    Func<string, Action<Stream>, bool> loader = StorageService.LoadFile;
 
                 if (name.StartsWith("res://", StringComparison.OrdinalIgnoreCase))
                 {
@@ -146,91 +165,137 @@ namespace Jellyfish.Virtu
             }
             else
 #endif
-            if (!_storageService.Load(Machine.StateFileName, stream => LoadState(stream)))
-            {
-                StorageService.LoadResource("Disks/Default.dsk", stream => BootDiskII.BootDrive.InsertDisk("Default.dsk", stream, false));
+            // if (!_storageService.Load(Machine.StateFileName, stream => LoadState(stream)))
+            if (true) {
+                StorageService.LoadResource( "Disks/Default.dsk", stream => BootDiskII.BootDrive.InsertDisk( "Default.dsk", stream, false ) );
             }
         }
 
-        private void LoadState(Stream stream)
-        {
-            using (var reader = new BinaryReader(stream))
-            {
+        private void LoadState( Stream stream ) {
+            using (var reader = new BinaryReader( stream )) {
                 string signature = reader.ReadString();
-                var version = new Version(reader.ReadString());
-                if ((signature != StateSignature) || (version != new Version(Machine.Version))) // avoid state version mismatch (for now)
-                {
+                var version = new Version( reader.ReadString() );
+
+                // avoid state version mismatch (for now)
+                if ((signature != StateSignature) || (version != new Version( Machine.Version ))) {
                     throw new InvalidOperationException();
                 }
-                foreach (var component in Components)
-                {
-                    _debugService.WriteMessage("Loading machine '{0}'", component.GetType().Name);
-                    component.LoadState(reader, version);
-                    //_debugService.WriteMessage("Loaded machine '{0}'", component.GetType().Name);
+                foreach (var component in Components) {
+                    DebugMessage( "Loading machine '{0}'", component.GetType().Name );
+                    component.LoadState( reader, version );
+                    //DebugMessage("Loaded machine '{0}'", component.GetType().Name);
                 }
             }
         }
 
-        private void SaveState()
-        {
-            _storageService.Save(Machine.StateFileName, stream => SaveState(stream));
+        private void SaveState() {
+            _storageService.Save( Machine.StateFileName, stream => SaveState( stream ) );
         }
 
-        private void SaveState(Stream stream)
-        {
-            using (var writer = new BinaryWriter(stream))
-            {
-                writer.Write(StateSignature);
-                writer.Write(Machine.Version);
-                foreach (var component in Components)
-                {
-                    _debugService.WriteMessage("Saving machine '{0}'", component.GetType().Name);
-                    component.SaveState(writer);
-                    //_debugService.WriteMessage("Saved machine '{0}'", component.GetType().Name);
+        private void SaveState( Stream stream ) {
+            using (var writer = new BinaryWriter( stream )) {
+                writer.Write( StateSignature );
+                writer.Write( Machine.Version );
+                foreach (var component in Components) {
+                    DebugMessage( "Saving machine '{0}'", component.GetType().Name );
+                    component.SaveState( writer );
+                    //DebugMessage("Saved machine '{0}'", component.GetType().Name);
                 }
             }
         }
+        #endregion
 
-        private void Uninitialize()
-        {
-            foreach (var component in Components)
-            {
-                _debugService.WriteMessage("Uninitializing machine '{0}'", component.GetType().Name);
+        private void Uninitialize() {
+            foreach (var component in Components) {
+                DebugMessage( "Uninitializing machine '{0}'", component.GetType().Name );
                 component.Uninitialize();
-                //_debugService.WriteMessage("Uninitialized machine '{0}'", component.GetType().Name);
+                //DebugMessage("Uninitialized machine '{0}'", component.GetType().Name);
             }
         }
 
-        [SuppressMessage("Microsoft.Globalization", "CA1303:Do not pass literals as localized parameters", MessageId = "Jellyfish.Virtu.Services.DebugService.WriteMessage(System.String)")]
-        private void Run() // machine thread
-        {
+        private void RunMachineThread() {
             Initialize();
             Reset();
+
+            // load last state by default, see SaveState below
             LoadState();
 
-            _debugService.WriteMessage("Running machine");
+            DebugMessage( "initialized, reset, loaded state" );
+            // we don't start execution of 6502 code right away
+            State = MachineState.Paused;
+            _pausedEvent.Set();
+
+            // we can use the Paused state to load a different state, or insert boot disk, then set breakpoints etc.
+
+            // IMPORTANT: Machine must be unpaused manually
+            _unpausedEvent.WaitOne();
+            _pausedEvent.Reset();
+
+            // we are now officially running
             State = MachineState.Running;
-            do
-            {
-                do
-                {
-                    Events.HandleEvents(Cpu.Execute());
+            DebugMessage( "machine running (in RunMachineThread)" );
+
+            bool isBreakpointAtRPC = false;
+
+            do {
+                do {
+                    if (isBreakpointAtRPC) {
+                        // do not break yet again on the same RPC
+                        DebugMessage( "maching skipping handled breakpoint" );
+                        isBreakpointAtRPC = false;
+                        Events.HandleEvents( Cpu.Execute() );
+                    } else {
+                        if (Memory.DebugInfo[Cpu.RPC].Flags.HasFlag( DebugFlags.Breakpoint )) {
+                            DebugMessage( "machine encountered breakpoint" );
+                            // it's a breakpoint, so pause the machine
+                            isBreakpointAtRPC = true;
+                            State = MachineState.Pausing;
+                        } else {
+                            Events.HandleEvents( Cpu.Execute() );
+                        }
+                    }
                 }
                 while (State == MachineState.Running);
 
-                if (State == MachineState.Pausing)
-                {
-                    _pauseEvent.Set();
-                    _unpauseEvent.WaitOne();
+                if (State == MachineState.Pausing) {
+
+                    // signal that we have reached Paused state
+                    State = MachineState.Paused;
+                    _pausedEvent.Set();
+                    DebugMessage( "machine Paused" );
+                    MainPage.Dispatcher.Send( () => MainPage.OnPause() );
+
+                    DebugMessage( "machine now waiting for Unpause" );
+
+                    // to continue, either Unpause() or Stop()
+                    _unpausedEvent.WaitOne();
+                    _pausedEvent.Reset();
+                    MainPage.Dispatcher.Send( () => MainPage.OnUnpause() );
+
+                    DebugMessage( "machine unpaused" );
+
+                    // stopping of the machine can also be triggered while being paused
+                    // in this case we must not transition to Running
+                    if (State != MachineState.Stopping) {
+
+                        // was Unpause(), so it's safe to continue execution
+                        State = MachineState.Running;
+                    }
+
                 }
             }
             while (State != MachineState.Stopping);
 
+            DebugMessage( "machine has exited main Cpu.Execute loop" );
+
+            // by default save the current state (see LoadState above)
             SaveState();
             Uninitialize();
         }
 
         public const string Version = "0.9.4.0";
+
+        public MainPage MainPage { get; private set; }
 
         public MachineEvents Events { get; private set; }
         public MachineServices Services { get; private set; }
@@ -258,16 +323,22 @@ namespace Jellyfish.Virtu
 
         public DiskIIController BootDiskII { get; private set; }
 
-        public Thread Thread { get; private set; }
+        public Thread MachineThread { get; private set; }
 
         private const string StateFileName = "State.bin";
         private const string StateSignature = "Virtu";
 
         private DebugService _debugService;
+        public DebugService DebugService { get { return _debugService; } }
+
         private StorageService _storageService;
         private volatile MachineState _state;
 
-        private AutoResetEvent _pauseEvent = new AutoResetEvent(false);
-        private AutoResetEvent _unpauseEvent = new AutoResetEvent(false);
+        private ManualResetEvent _pausedEvent = new ManualResetEvent( false );
+        private AutoResetEvent _unpausedEvent = new AutoResetEvent( false );
+
+        public void WaitForPaused() {
+            _pausedEvent.WaitOne();
+        }
     }
 }

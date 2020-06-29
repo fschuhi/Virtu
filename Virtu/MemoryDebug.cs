@@ -2,36 +2,28 @@
 using System.IO;
 using System.Text;
 
-namespace Jellyfish.Virtu
-{
-    public partial class Memory
-    {
-        public void Exsourcise(int startAddress, int endAddress, string filename)
-        {
+namespace Jellyfish.Virtu {
+    public partial class Memory {
+        public void Exsourcise( int startAddress, int endAddress, string filename ) {
             int[] info = new int[0x10000];
 
-            using (StreamWriter sourceFile = new System.IO.StreamWriter(filename + ".S", false))
-            {
-                sourceFile.WriteLine(String.Format(" ORG ${0:X4}", startAddress));
+            using (StreamWriter sourceFile = new System.IO.StreamWriter( filename + ".S", false )) {
+                sourceFile.WriteLine( String.Format( " ORG ${0:X4}", startAddress ) );
 
                 // Find externs
                 int address = startAddress;
-                while (address <= endAddress)
-                {
-                    if (DebugInfo[address].Flags.HasFlag(DebugFlags.Opcode))
-                    {
-                        int opcode = ReadDebug(address);
+                while (address <= endAddress) {
+                    if (DebugInfo[address].Flags.HasFlag( DebugFlags.Opcode )) {
+                        int opcode = ReadDebug( address );
                         A addressingMode = AddressingMode65N02[opcode];
                         int opcodeLength = AddressingModeLength[(int)addressingMode];
-                        int operand = ReadDebug((address + 1) & 0xFFFF);
-                        int byte2 = ReadDebug((address + 2) & 0xFFFF);
-                        if (opcodeLength == 3)
-                        {
+                        int operand = ReadDebug( (address + 1) & 0xFFFF );
+                        int byte2 = ReadDebug( (address + 2) & 0xFFFF );
+                        if (opcodeLength == 3) {
                             operand = (byte2 << 8) | operand;
                         }
 
-                        switch (addressingMode)
-                        {
+                        switch (addressingMode) {
                             case A.Rel: // Relative                   $0000
                                 {
                                     int branchDest = (address + 2 + (sbyte)operand) & 0xFFFF;
@@ -52,85 +44,71 @@ namespace Jellyfish.Virtu
                             case A.AIX: // Absolute Indexed Indirect  ($0000,X)
                                 {
                                     info[operand] |= 1; // label
-                                    if (operand < startAddress || operand > endAddress)
-                                    {
+                                    if (operand < startAddress || operand > endAddress) {
                                         info[operand] |= 2; // extern
                                     }
                                 }
                                 break;
                         }
                         address += opcodeLength;
-                    }
-                    else
-                    {
+                    } else {
                         address += 1;
                     }
                 }
 
                 // Output EQUs for externs
-                for (address = 0; address <= 0xFFFF; address++)
-                {
+                for (address = 0; address <= 0xFFFF; address++) {
                     if ((info[address] & 2) != 0 && (address < startAddress || address > endAddress)) // extern
                     {
-                        sourceFile.WriteLine("H{0:X4} EQU ${0:X4}", address);
+                        sourceFile.WriteLine( "H{0:X4} EQU ${0:X4}", address );
                     }
                 }
 
                 // Output source code
                 address = startAddress;
-                while (address <= endAddress)
-                {
+                while (address <= endAddress) {
                     if ((info[address] & 1) != 0) // label
                     {
-                        sourceFile.Write("H{0:X4}", address);
+                        sourceFile.Write( "H{0:X4}", address );
                     }
 
-                    int opcode = ReadDebug(address);
+                    int opcode = ReadDebug( address );
                     //if (Legal65N02[opcode]) // TODO: Standalone needs logic like this
-                    if (DebugInfo[address].Flags.HasFlag(DebugFlags.Opcode) || (opcode != 0x00 && Legal65N02[opcode]))
-                    {
-                        int operand0 = ReadDebug((address + 1) & 0xFFFF);
-                        int operand1 = ReadDebug((address + 2) & 0xFFFF);
+                    if (DebugInfo[address].Flags.HasFlag( DebugFlags.Opcode ) || (opcode != 0x00 && Legal65N02[opcode])) {
+                        int operand0 = ReadDebug( (address + 1) & 0xFFFF );
+                        int operand1 = ReadDebug( (address + 2) & 0xFFFF );
                         int operand2 = (address + 2 + (sbyte)operand0) & 0xFFFF;
-                        sourceFile.Write(" ");
-                        sourceFile.Write(Mnemonic[(int)Mnemonic65N02[opcode]]);
-                        sourceFile.Write(" ");
-                        sourceFile.Write(AddressingModeFormat[(int)AddressingMode65N02[opcode]],
+                        sourceFile.Write( " " );
+                        sourceFile.Write( Mnemonic[(int)Mnemonic65N02[opcode]] );
+                        sourceFile.Write( " " );
+                        sourceFile.Write( AddressingModeFormat[(int)AddressingMode65N02[opcode]],
                             operand0,
                             operand1,
                             operand2,
-                            "H");
+                            "H" );
                         address += AddressingModeLength[(int)AddressingMode65N02[opcode]];
-                    }
-                    else
-                    {
+                    } else {
                         int ascLen = 0;
                         int test = opcode;
-                        while (test >= 0x20 && test <= 0x5D)
-                        {
+                        while (test >= 0x20 && test <= 0x5D) {
                             ascLen++;
                             if ((address + ascLen > endAddress) ||
                                 (ascLen == 16) ||
-                                (DebugInfo[address + ascLen].Flags.HasFlag(DebugFlags.Opcode)))
-                            {
+                                (DebugInfo[address + ascLen].Flags.HasFlag( DebugFlags.Opcode ))) {
                                 break;
                             }
-                            test = ReadDebug(address + ascLen);
+                            test = ReadDebug( address + ascLen );
                         }
 
-                        if (ascLen >= 5)
-                        {
-                            sourceFile.Write(" ASC '", opcode);
-                            for (int i = 0; i < ascLen; i++)
-                            {
-                                sourceFile.Write(Convert.ToChar(ReadDebug(address + i)));
+                        if (ascLen >= 5) {
+                            sourceFile.Write( " ASC '", opcode );
+                            for (int i = 0; i < ascLen; i++) {
+                                sourceFile.Write( Convert.ToChar( ReadDebug( address + i ) ) );
                             }
-                            sourceFile.Write('\'');
+                            sourceFile.Write( '\'' );
                             address += ascLen;
-                        }
-                        else
-                        {
-                            sourceFile.Write(" HEX {0:X2}", opcode);
+                        } else {
+                            sourceFile.Write( " HEX {0:X2}", opcode );
                             address += 1;
                         }
                     }
@@ -140,23 +118,22 @@ namespace Jellyfish.Virtu
             }
         }
 
-        public int Disassemble(int address, StringBuilder stringBuilder)
-        {
-            int opcode = ReadDebug(address);
-            int operand0 = ReadDebug((address + 1) & 0xFFFF);
-            int operand1 = ReadDebug((address + 2) & 0xFFFF);
+        public int Disassemble( int address, StringBuilder stringBuilder ) {
+            int opcode = ReadDebug( address );
+            int operand0 = ReadDebug( (address + 1) & 0xFFFF );
+            int operand1 = ReadDebug( (address + 2) & 0xFFFF );
             int operand2 = (address + 2 + (sbyte)operand0) & 0xFFFF;
 
             int mnemonic = (Machine.Cpu.Is65C02) ? (int)Mnemonic65C02[opcode] : (int)Mnemonic65N02[opcode];
             int addressingMode = (Machine.Cpu.Is65C02) ? (int)AddressingMode65C02[opcode] : (int)AddressingMode65N02[opcode];
 
-            stringBuilder.Append(Mnemonic[mnemonic]);
-            stringBuilder.Append(" ");
-            stringBuilder.AppendFormat(AddressingModeFormat[addressingMode],
+            stringBuilder.Append( Mnemonic[mnemonic] );
+            stringBuilder.Append( " " );
+            stringBuilder.AppendFormat( AddressingModeFormat[addressingMode],
                 operand0,
                 operand1,
                 operand2,
-                "$");
+                "$" );
             return AddressingModeLength[addressingMode];
         }
 
@@ -202,8 +179,7 @@ namespace Jellyfish.Virtu
             /* Fx */ true,  true,  true,  false, false, true,  true,  false, true,  true,  true,  false, false, true,  true,  false,
         };
 
-        public enum M
-        {
+        public enum M {
             ADC,
             ANC, // 65N02 Illegal
             AND,
@@ -420,8 +396,7 @@ namespace Jellyfish.Virtu
             M.BEQ, M.SBC, M.SBC, M.NOP, M.NOP, M.SBC, M.INC, M.NOP, M.SED, M.SBC, M.PLX, M.NOP, M.NOP, M.SBC, M.INC, M.NOP  // Fx
         };
 
-        public enum A
-        {
+        public enum A {
             Imp, // Implied
             Imm, // Immediate                  #$00
             Rel, // Relative                   $0000

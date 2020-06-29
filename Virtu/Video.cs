@@ -83,7 +83,7 @@ namespace Jellyfish.Virtu
         {
             SetCharSet();
             DirtyScreen();
-            FlushScreen();
+            FlushScreen();            
         }
 
         public override void LoadState(BinaryReader reader, Version version)

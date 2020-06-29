@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Threading;
 
 namespace Jellyfish.Virtu
 {
@@ -23,8 +24,35 @@ namespace Jellyfish.Virtu
 
     public sealed class MachineEvents
     {
+        static string _threadName = "";
+        Machine _machine;
+
+        public MachineEvents(Machine machine)
+        {
+            // needed to get DebugService
+            _machine = machine;
+        }
+
         public void AddEvent(int delta, Action action)
         {
+            // _machine.DebugService.WriteMessage(action.Method.ReflectedType.FullName + "." + action.Method.Name);
+            //_machine.DebugService.WriteMessage(action.Method.Name);
+
+            // check that AddEvent() is always and only called from "Machine" thread
+            if (_threadName == "")
+            {
+                _threadName = Thread.CurrentThread.Name;
+                _machine.DebugService.WriteMessage("first AddEvent() called rom '{0}'", _threadName);
+            }
+            else
+            {
+                if (Thread.CurrentThread.Name !=_threadName)
+                {
+                    // caller is not the first thread which added an Event (i.e. "Machine")
+                    throw new InvalidOperationException("Don't be evil!");
+                }
+            }
+
             var node = _used.First;
             for (; node != null; node = node.Next)
             {

@@ -289,8 +289,9 @@ namespace Jellyfish.Virtu
             DebugInfo[address].LastExecCycle = Machine.Cpu.Cycles;
             DebugInfo[address].Flags |= DebugFlags.Opcode;
 
-            if (DebugInfo[address].Flags.HasFlag(DebugFlags.Breakpoint))
-                Machine.Pause();
+            // not intuitive to stop execution *after* the operation where we set the breakpoint
+            //if (DebugInfo[address].Flags.HasFlag(DebugFlags.Breakpoint))
+            //    Machine.Pause();
 
             return ReadBanked(address);
         }

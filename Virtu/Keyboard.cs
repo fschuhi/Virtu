@@ -2,28 +2,22 @@
 using System.IO;
 using Jellyfish.Virtu.Services;
 
-namespace Jellyfish.Virtu
-{
-    public sealed class Keyboard : MachineComponent
-    {
-        public Keyboard(Machine machine) :
-            base(machine)
-        {
+namespace Jellyfish.Virtu {
+    public sealed class Keyboard : MachineComponent {
+        public Keyboard( Machine machine ) :
+            base( machine ) {
         }
 
-        public override void Initialize()
-        {
+        public override void Initialize() {
             _keyboardService = Machine.Services.GetService<KeyboardService>();
 
             UseGamePort = true; // Raster Blaster
             Button2Key = ' ';
         }
 
-        public override void LoadState(BinaryReader reader, Version version)
-        {
-            if (reader == null)
-            {
-                throw new ArgumentNullException("reader");
+        public override void LoadState( BinaryReader reader, Version version ) {
+            if (reader == null) {
+                throw new ArgumentNullException( "reader" );
             }
 
             DisableResetKey = reader.ReadBoolean();
@@ -50,39 +44,36 @@ namespace Jellyfish.Virtu
             Button2Key = reader.ReadInt32();
         }
 
-        public override void SaveState(BinaryWriter writer)
-        {
-            if (writer == null)
-            {
-                throw new ArgumentNullException("writer");
+        public override void SaveState( BinaryWriter writer ) {
+            if (writer == null) {
+                throw new ArgumentNullException( "writer" );
             }
 
-            writer.Write(DisableResetKey);
+            writer.Write( DisableResetKey );
 
-            writer.Write(UseGamePort);
-            writer.Write(Joystick0UpLeftKey);
-            writer.Write(Joystick0UpKey);
-            writer.Write(Joystick0UpRightKey);
-            writer.Write(Joystick0LeftKey);
-            writer.Write(Joystick0RightKey);
-            writer.Write(Joystick0DownLeftKey);
-            writer.Write(Joystick0DownKey);
-            writer.Write(Joystick0DownRightKey);
-            writer.Write(Joystick1UpLeftKey);
-            writer.Write(Joystick1UpKey);
-            writer.Write(Joystick1UpRightKey);
-            writer.Write(Joystick1LeftKey);
-            writer.Write(Joystick1RightKey);
-            writer.Write(Joystick1DownLeftKey);
-            writer.Write(Joystick1DownKey);
-            writer.Write(Joystick1DownRightKey);
-            writer.Write(Button0Key);
-            writer.Write(Button1Key);
-            writer.Write(Button2Key);
+            writer.Write( UseGamePort );
+            writer.Write( Joystick0UpLeftKey );
+            writer.Write( Joystick0UpKey );
+            writer.Write( Joystick0UpRightKey );
+            writer.Write( Joystick0LeftKey );
+            writer.Write( Joystick0RightKey );
+            writer.Write( Joystick0DownLeftKey );
+            writer.Write( Joystick0DownKey );
+            writer.Write( Joystick0DownRightKey );
+            writer.Write( Joystick1UpLeftKey );
+            writer.Write( Joystick1UpKey );
+            writer.Write( Joystick1UpRightKey );
+            writer.Write( Joystick1LeftKey );
+            writer.Write( Joystick1RightKey );
+            writer.Write( Joystick1DownLeftKey );
+            writer.Write( Joystick1DownKey );
+            writer.Write( Joystick1DownRightKey );
+            writer.Write( Button0Key );
+            writer.Write( Button1Key );
+            writer.Write( Button2Key );
         }
 
-        public void ResetStrobe()
-        {
+        public void ResetStrobe() {
             Strobe = false;
         }
 
