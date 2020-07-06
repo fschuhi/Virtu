@@ -6,3 +6,5 @@ obj/
 *.cachefile
 *.suo
 *.user
+
+*.bat

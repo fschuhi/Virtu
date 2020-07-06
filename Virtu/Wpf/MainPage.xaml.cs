@@ -33,7 +33,7 @@ namespace Jellyfish.Virtu {
 
                 _memoryWindow = new MemoryWindow( Machine );
 
-                Loaded += ( sender, e ) => Machine.Start();
+                Loaded += ( sender, e ) => Machine.StartMachineThread();
                 CompositionTarget.Rendering += OnCompositionTargetRendering;
 
                 // FS 20.06.20 now not an App anymore

@@ -43,6 +43,7 @@ namespace Jellyfish.Virtu {
             BootDiskII = Slots.OfType<DiskIIController>().Last();
 
             MachineThread = new Thread( RunMachineThread ) { Name = "Machine" };
+            MachineThread.IsBackground = true;
         }
 
         public void Dispose() {
@@ -67,7 +68,7 @@ namespace Jellyfish.Virtu {
             }
         }
 
-        public void Start() {
+        public void StartMachineThread() {
             _debugService = Services.GetService<DebugService>();
             _storageService = Services.GetService<StorageService>();
 
@@ -100,7 +101,7 @@ namespace Jellyfish.Virtu {
             }
         }
 
-        public void Stop() {
+        public void StopMachineThread() {
             if (State == MachineState.Stopped) return;
 
             DebugMessage( "Stopping machine" );
@@ -171,7 +172,7 @@ namespace Jellyfish.Virtu {
             }
         }
 
-        private void LoadState( Stream stream ) {
+        public void LoadState( Stream stream ) {
             using (var reader = new BinaryReader( stream )) {
                 string signature = reader.ReadString();
                 var version = new Version( reader.ReadString() );
@@ -203,6 +204,15 @@ namespace Jellyfish.Virtu {
                 }
             }
         }
+
+
+        public void SaveState( string name ) {
+            _storageService.Save( name, stream => SaveState( stream ) );
+        }
+        public void LoadState( string name ) {
+            _storageService.Load( name, stream => LoadState( stream ) );
+        }
+
         #endregion
 
         private void Uninitialize() {
@@ -218,7 +228,8 @@ namespace Jellyfish.Virtu {
             Reset();
 
             // load last state by default, see SaveState below
-            LoadState();
+            // LoadState();
+            LoadState( "bla.bin " );
 
             DebugMessage( "initialized, reset, loaded state" );
             // we don't start execution of 6502 code right away
@@ -263,14 +274,17 @@ namespace Jellyfish.Virtu {
                     State = MachineState.Paused;
                     _pausedEvent.Set();
                     DebugMessage( "machine Paused" );
-                    MainPage.Dispatcher.Send( () => MainPage.OnPause() );
+                     MainPage.Dispatcher.Send( () => MainPage.OnPause() );
+
+                    // SaveState( "bla.bin " );
 
                     DebugMessage( "machine now waiting for Unpause" );
 
                     // to continue, either Unpause() or Stop()
                     _unpausedEvent.WaitOne();
                     _pausedEvent.Reset();
-                    MainPage.Dispatcher.Send( () => MainPage.OnUnpause() );
+                    if (State != MachineState.Stopping)
+                        MainPage.Dispatcher.Send( () => MainPage.OnUnpause() );
 
                     DebugMessage( "machine unpaused" );
 
@@ -286,11 +300,17 @@ namespace Jellyfish.Virtu {
             }
             while (State != MachineState.Stopping);
 
-            DebugMessage( "machine has exited main Cpu.Execute loop" );
+            DebugMessage( "machine has exited main Cpu.Execute loop, saving state" );
 
             // by default save the current state (see LoadState above)
-            SaveState();
+            // SaveState();
             Uninitialize();
+
+            // indiscriminately set events to release anyone still listening
+            _unpausedEvent.Set();
+            _pausedEvent.Set();
+
+            DebugMessage( "machine exits RunMachineThread" );
         }
 
         public const string Version = "0.9.4.0";
