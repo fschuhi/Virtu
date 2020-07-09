@@ -1,14 +1,20 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Windows.Controls;
 using System.Windows.Input;
+
+// do not use WpfKeyboardService.cs  -- use VirtuRoCWpfKeyboardService.cs instead
 
 namespace Jellyfish.Virtu.Services {
     public sealed class WpfKeyboardService : KeyboardService {
 
         public WpfKeyboardService( Machine machine, UserControl page ) :
             base( machine ) {
+
+            Debug.Assert( false, "do not use WpfKeyboardService.cs  -- use VirtuRoCWpfKeyboardService.cs instead" );
+
             if (page == null) {
                 throw new ArgumentNullException( "page" );
             }

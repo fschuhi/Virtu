@@ -60,6 +60,114 @@ namespace Jellyfish.Virtu {
             }
         }
 
+        #region Initialize / Uninitialize
+        private void Initialize() {
+            foreach (var component in Components) {
+                DebugMessage( "Initializing machine '{0}'", component.GetType().Name );
+                component.Initialize();
+                //DebugMessage("Initialized machine '{0}'", component.GetType().Name);
+            }
+        }
+
+        private void Uninitialize() {
+            foreach (var component in Components) {
+                DebugMessage( "Uninitializing machine '{0}'", component.GetType().Name );
+                component.Uninitialize();
+                //DebugMessage("Uninitialized machine '{0}'", component.GetType().Name);
+            }
+        }
+        #endregion
+
+
+        #region load/save state
+        private void LoadStateFromStream( Stream stream ) {
+            using (var reader = new BinaryReader( stream )) {
+                string signature = reader.ReadString();
+                var version = new Version( reader.ReadString() );
+
+                // avoid state version mismatch (for now)
+                if ((signature != StateSignature) || (version != new Version( Machine.Version ))) {
+                    throw new InvalidOperationException();
+                }
+                foreach (var component in Components) {
+                    DebugMessage( "Loading machine '{0}'", component.GetType().Name );
+                    component.LoadState( reader, version );
+                    //DebugMessage("Loaded machine '{0}'", component.GetType().Name);
+                }
+            }
+        }
+
+        private void SaveStateToStream( Stream stream ) {
+            using (var writer = new BinaryWriter( stream )) {
+                writer.Write( StateSignature );
+                writer.Write( Machine.Version );
+                foreach (var component in Components) {
+                    DebugMessage( "Saving machine '{0}'", component.GetType().Name );
+                    component.SaveState( writer );
+                    //DebugMessage("Saved machine '{0}'", component.GetType().Name);
+                }
+            }
+        }
+
+        private void LoadState() {
+            // #if WINDOWS
+#if BLA
+            var args = Environment.GetCommandLineArgs();
+            if (args.Length > 1)
+                {
+                    string name = args[1];
+                    Func<string, Action<Stream>, bool> loader = StorageService.LoadFile;
+
+                if (name.StartsWith("res://", StringComparison.OrdinalIgnoreCase))
+                {
+                    name = name.Substring(6);
+                    loader = StorageService.LoadResource;
+                }
+
+                if (name.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))
+                {
+                    loader(name, stream => LoadState(stream));
+                }
+                else if (name.EndsWith(".prg", StringComparison.OrdinalIgnoreCase))
+                {
+                    loader(name, stream => Memory.LoadPrg(stream));
+                }
+                else if (name.EndsWith(".xex", StringComparison.OrdinalIgnoreCase))
+                {
+                    loader(name, stream => Memory.LoadXex(stream));
+                }
+                else
+                {
+                    loader(name, stream => BootDiskII.BootDrive.InsertDisk(name, stream, false));
+                }
+            }
+            else
+#endif
+            // if (!_storageService.Load(Machine.StateFileName, stream => LoadState(stream)))
+            if (true) {
+                StorageService.LoadResource( "Disks/Default.dsk", stream => BootDiskII.BootDrive.InsertDisk( "Default.dsk", stream, false ) );
+            }
+        }
+
+        public void LoadStateFromFile( string name ) {
+            StorageService.LoadFile( name, stream => LoadStateFromStream( stream ) );
+        }
+        private void SaveStateToStore() {
+            SaveStateToStore( Machine.StateFileName );
+        }
+        public void SaveStateToStore( string name ) {
+            _storageService.Save( name, stream => SaveStateToStream( stream ) );
+        }
+        public void LoadStateFromStore( string name ) {
+            _storageService.Load( name, stream => LoadStateFromStream( stream ) );
+        }
+        public void SaveStateToFile( string name ) {
+            StorageService.SaveFile( name, stream => SaveStateToStream( stream ) );
+        }
+
+        #endregion
+
+
         public void Reset() {
             foreach (var component in Components) {
                 DebugMessage( "Resetting machine '{0}'", component.GetType().Name );
@@ -119,108 +227,8 @@ namespace Jellyfish.Virtu {
             DebugMessage( "Stopped machine" );
         }
 
-        private void Initialize() {
-            foreach (var component in Components) {
-                DebugMessage( "Initializing machine '{0}'", component.GetType().Name );
-                component.Initialize();
-                //DebugMessage("Initialized machine '{0}'", component.GetType().Name);
-            }
-        }
-
         public bool IsInMachineThread() {
             return Thread.CurrentThread == MachineThread;
-        }
-
-        #region state mgmnt
-        private void LoadState() {
-            // #if WINDOWS
-#if BLA
-            var args = Environment.GetCommandLineArgs();
-            if (args.Length > 1)
-                {
-                    string name = args[1];
-                    Func<string, Action<Stream>, bool> loader = StorageService.LoadFile;
-
-                if (name.StartsWith("res://", StringComparison.OrdinalIgnoreCase))
-                {
-                    name = name.Substring(6);
-                    loader = StorageService.LoadResource;
-                }
-
-                if (name.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))
-                {
-                    loader(name, stream => LoadState(stream));
-                }
-                else if (name.EndsWith(".prg", StringComparison.OrdinalIgnoreCase))
-                {
-                    loader(name, stream => Memory.LoadPrg(stream));
-                }
-                else if (name.EndsWith(".xex", StringComparison.OrdinalIgnoreCase))
-                {
-                    loader(name, stream => Memory.LoadXex(stream));
-                }
-                else
-                {
-                    loader(name, stream => BootDiskII.BootDrive.InsertDisk(name, stream, false));
-                }
-            }
-            else
-#endif
-            // if (!_storageService.Load(Machine.StateFileName, stream => LoadState(stream)))
-            if (true) {
-                StorageService.LoadResource( "Disks/Default.dsk", stream => BootDiskII.BootDrive.InsertDisk( "Default.dsk", stream, false ) );
-            }
-        }
-
-        public void LoadState( Stream stream ) {
-            using (var reader = new BinaryReader( stream )) {
-                string signature = reader.ReadString();
-                var version = new Version( reader.ReadString() );
-
-                // avoid state version mismatch (for now)
-                if ((signature != StateSignature) || (version != new Version( Machine.Version ))) {
-                    throw new InvalidOperationException();
-                }
-                foreach (var component in Components) {
-                    DebugMessage( "Loading machine '{0}'", component.GetType().Name );
-                    component.LoadState( reader, version );
-                    //DebugMessage("Loaded machine '{0}'", component.GetType().Name);
-                }
-            }
-        }
-
-        private void SaveState() {
-            _storageService.Save( Machine.StateFileName, stream => SaveState( stream ) );
-        }
-
-        private void SaveState( Stream stream ) {
-            using (var writer = new BinaryWriter( stream )) {
-                writer.Write( StateSignature );
-                writer.Write( Machine.Version );
-                foreach (var component in Components) {
-                    DebugMessage( "Saving machine '{0}'", component.GetType().Name );
-                    component.SaveState( writer );
-                    //DebugMessage("Saved machine '{0}'", component.GetType().Name);
-                }
-            }
-        }
-
-
-        public void SaveState( string name ) {
-            _storageService.Save( name, stream => SaveState( stream ) );
-        }
-        public void LoadState( string name ) {
-            _storageService.Load( name, stream => LoadState( stream ) );
-        }
-
-        #endregion
-
-        private void Uninitialize() {
-            foreach (var component in Components) {
-                DebugMessage( "Uninitializing machine '{0}'", component.GetType().Name );
-                component.Uninitialize();
-                //DebugMessage("Uninitialized machine '{0}'", component.GetType().Name);
-            }
         }
 
         private void RunMachineThread() {
@@ -228,8 +236,8 @@ namespace Jellyfish.Virtu {
             Reset();
 
             // load last state by default, see SaveState below
-            // LoadState();
-            LoadState( "bla.bin " );
+            //LoadState();
+            //LoadState( "bla.bin " );
 
             DebugMessage( "initialized, reset, loaded state" );
             // we don't start execution of 6502 code right away

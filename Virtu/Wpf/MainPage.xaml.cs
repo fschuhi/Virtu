@@ -13,39 +13,43 @@ namespace Jellyfish.Virtu {
         public MainPage() {
             InitializeComponent();
 
-            Window = Window.GetWindow( this );
             Machine = new Machine( this );
+        }
 
-            if (!DesignerProperties.GetIsInDesignMode( this )) {
-                _debugService = DebugService.Default;
-                _storageService = new WpfStorageService( Machine );
+        public void Init( KeyboardService keyboardService) {
+
+            _debugService = DebugService.Default;
+            _storageService = new WpfStorageService( Machine );
+            if ( keyboardService != null ) {
+                _keyboardService = keyboardService;
+            } else {
                 _keyboardService = new WpfKeyboardService( Machine, this );
-                _gamePortService = new GamePortService( Machine ); // not connected
-                _audioService = new WpfAudioService( Machine, this );
-                _videoService = new WpfVideoService( Machine, this, _image );
-
-                Machine.Services.AddService( typeof( DebugService ), _debugService );
-                Machine.Services.AddService( typeof( StorageService ), _storageService );
-                Machine.Services.AddService( typeof( KeyboardService ), _keyboardService );
-                Machine.Services.AddService( typeof( GamePortService ), _gamePortService );
-                Machine.Services.AddService( typeof( AudioService ), _audioService );
-                Machine.Services.AddService( typeof( VideoService ), _videoService );
-
-                _memoryWindow = new MemoryWindow( Machine );
-
-                Loaded += ( sender, e ) => Machine.StartMachineThread();
-                CompositionTarget.Rendering += OnCompositionTargetRendering;
-
-                // FS 20.06.20 now not an App anymore
-                // Application.Current.Exit += (sender, e) => Machine.Stop();
-
-                // 28.06.20 seems like Unloaded is never called on close => now in MainWindow.OnClosing()
-                // Unloaded += ( sender, e ) => Machine.Stop();
-
-                _disk1Button.Click += ( sender, e ) => OnDiskButtonClick( 0 );
-                _disk2Button.Click += ( sender, e ) => OnDiskButtonClick( 1 );
-                _memoryButton.Click += ( sender, e ) => OnMemoryButtonClick();
             }
+            _gamePortService = new GamePortService( Machine ); // not connected
+            _audioService = new WpfAudioService( Machine, this );
+            _videoService = new WpfVideoService( Machine, this, _image );
+
+            Machine.Services.AddService( typeof( DebugService ), _debugService );
+            Machine.Services.AddService( typeof( StorageService ), _storageService );
+            Machine.Services.AddService( typeof( KeyboardService ), _keyboardService );
+            Machine.Services.AddService( typeof( GamePortService ), _gamePortService );
+            Machine.Services.AddService( typeof( AudioService ), _audioService );
+            Machine.Services.AddService( typeof( VideoService ), _videoService );
+
+            _memoryWindow = new MemoryWindow( Machine );
+
+            // Loaded += ( sender, e ) => Machine.StartMachineThread();
+            CompositionTarget.Rendering += OnCompositionTargetRendering;
+
+            // FS 20.06.20 now not an App anymore
+            // Application.Current.Exit += (sender, e) => Machine.Stop();
+
+            // 28.06.20 seems like Unloaded is never called on close => now in MainWindow.OnClosing()
+            // Unloaded += ( sender, e ) => Machine.Stop();
+
+            _disk1Button.Click += ( sender, e ) => OnDiskButtonClick( 0 );
+            _disk2Button.Click += ( sender, e ) => OnDiskButtonClick( 1 );
+            _memoryButton.Click += ( sender, e ) => OnMemoryButtonClick();
         }
 
         public void OnPause() {
@@ -106,19 +110,19 @@ namespace Jellyfish.Virtu {
             }
         }
 
-        public Window Window { get; private set; }
-        public Machine Machine { get; private set; }
+        public Window MainWindow { get; private set; }
+        public Machine Machine { get; set; }
 
-        private DebugService _debugService;
-        private StorageService _storageService;
-        private KeyboardService _keyboardService;
-        private GamePortService _gamePortService;
-        private AudioService _audioService;
-        private VideoService _videoService;
+        public DebugService _debugService;
+        public StorageService _storageService;
+        public KeyboardService _keyboardService;
+        public GamePortService _gamePortService;
+        public AudioService _audioService;
+        public VideoService _videoService;
 
         private long _lastCycles;
         private long _lastTime;
 
-        private MemoryWindow _memoryWindow;
+        public MemoryWindow _memoryWindow;
     }
 }
