@@ -39,17 +39,13 @@ namespace Jellyfish.Virtu
             //_machine.DebugService.WriteMessage(action.Method.Name);
 
             // check that AddEvent() is always and only called from "Machine" thread
-            if (_threadName == "")
-            {
+            if (_threadName == "") {
                 _threadName = Thread.CurrentThread.Name;
-                _machine.DebugService.WriteMessage("first AddEvent() called rom '{0}'", _threadName);
-            }
-            else
-            {
-                if (Thread.CurrentThread.Name !=_threadName)
-                {
+                _machine.DebugService.WriteMessage( "first AddEvent() called rom '{0}'", _threadName );
+            } else {
+                if (Thread.CurrentThread.Name != _threadName) {
                     // caller is not the first thread which added an Event (i.e. "Machine")
-                    throw new InvalidOperationException("Don't be evil!");
+                    //throw new InvalidOperationException( "Don't be evil!" );
                 }
             }
 

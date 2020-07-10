@@ -1,5 +1,6 @@
 ﻿using System;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.Threading;
 using System.Windows;
@@ -41,14 +42,9 @@ namespace Jellyfish.Virtu {
             // Loaded += ( sender, e ) => Machine.StartMachineThread();
             CompositionTarget.Rendering += OnCompositionTargetRendering;
 
-            // FS 20.06.20 now not an App anymore
-            // Application.Current.Exit += (sender, e) => Machine.Stop();
-
-            // 28.06.20 seems like Unloaded is never called on close => now in MainWindow.OnClosing()
-            // Unloaded += ( sender, e ) => Machine.Stop();
-
-            _disk1Button.Click += ( sender, e ) => OnDiskButtonClick( 0 );
-            _disk2Button.Click += ( sender, e ) => OnDiskButtonClick( 1 );
+            // see VirtuRoCWpfKeyboardService.cs
+            // _disk1Button.Click += ( sender, e ) => OnDiskButtonClick( 0 );
+            //_disk2Button.Click += ( sender, e ) => OnDiskButtonClick( 1 );
             _memoryButton.Click += ( sender, e ) => OnMemoryButtonClick();
         }
 
@@ -92,16 +88,6 @@ namespace Jellyfish.Virtu {
             }
         }
 
-        private void OnDiskButtonClick( int drive ) {
-            var dialog = new OpenFileDialog() { Filter = "Disk Files (*.dsk;*.nib;*.2mg;*.po;*.do)|*.dsk;*.nib;*.2mg;*.po;*.do|All Files (*.*)|*.*" };
-            bool? result = dialog.ShowDialog();
-            if (result.HasValue && result.Value) {
-                Machine.Pause();
-                StorageService.LoadFile( dialog.FileName, stream => Machine.BootDiskII.Drives[drive].InsertDisk( dialog.FileName, stream, false ) );
-                Machine.Unpause();
-            }
-        }
-
         private void OnMemoryButtonClick() {
             if (_memoryWindow.Visibility == Visibility.Visible) {
                 _memoryWindow.Hide();
@@ -110,7 +96,7 @@ namespace Jellyfish.Virtu {
             }
         }
 
-        public Window MainWindow { get; private set; }
+        public Window MainWindow { get { return Window.GetWindow( this ); } }
         public Machine Machine { get; set; }
 
         public DebugService _debugService;

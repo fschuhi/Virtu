@@ -9,21 +9,7 @@ namespace Jellyfish.Virtu.Services {
         public abstract bool IsKeyDown( int key );
 
         public virtual void Update() {
-
             Debug.Assert( false, "KeyboardService.Update() not used anymore -- now implemented in VirtuRoCWpfKeyboardService.cs" );
-
-            var keyboard = Machine.Keyboard;
-
-            if (IsResetKeyDown && !keyboard.DisableResetKey) {
-                if (!_resetKeyDown) {
-                    _resetKeyDown = true; // entering reset; pause until key released
-                    Machine.Pause();
-                    Machine.Reset();
-                }
-            } else if (_resetKeyDown) {
-                _resetKeyDown = false; // leaving reset
-                Machine.Unpause();
-            }
         }
 
         public bool IsAnyKeyDown { get; protected set; }
@@ -34,7 +20,5 @@ namespace Jellyfish.Virtu.Services {
         public bool IsCloseAppleKeyDown { get; protected set; }
 
         protected bool IsResetKeyDown { get; set; }
-
-        private bool _resetKeyDown;
     }
 }

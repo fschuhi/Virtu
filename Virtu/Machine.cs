@@ -5,6 +5,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using Jellyfish.Library;
 using Jellyfish.Virtu.Services;
@@ -61,19 +62,21 @@ namespace Jellyfish.Virtu {
         }
 
         #region Initialize / Uninitialize
-        private void Initialize() {
+        public void Initialize( object argument ) {
+
+            _debugService = Services.GetService<DebugService>();
+            _storageService = Services.GetService<StorageService>();
+
             foreach (var component in Components) {
                 DebugMessage( "Initializing machine '{0}'", component.GetType().Name );
                 component.Initialize();
-                //DebugMessage("Initialized machine '{0}'", component.GetType().Name);
             }
         }
 
-        private void Uninitialize() {
+        public void Uninitialize( object argument ) {
             foreach (var component in Components) {
                 DebugMessage( "Uninitializing machine '{0}'", component.GetType().Name );
                 component.Uninitialize();
-                //DebugMessage("Uninitialized machine '{0}'", component.GetType().Name);
             }
         }
         #endregion
@@ -92,7 +95,6 @@ namespace Jellyfish.Virtu {
                 foreach (var component in Components) {
                     DebugMessage( "Loading machine '{0}'", component.GetType().Name );
                     component.LoadState( reader, version );
-                    //DebugMessage("Loaded machine '{0}'", component.GetType().Name);
                 }
             }
         }
@@ -168,7 +170,7 @@ namespace Jellyfish.Virtu {
         #endregion
 
 
-        public void Reset() {
+        public void Reset( object argument ) {
             foreach (var component in Components) {
                 DebugMessage( "Resetting machine '{0}'", component.GetType().Name );
                 component.Reset();
@@ -176,64 +178,17 @@ namespace Jellyfish.Virtu {
             }
         }
 
-        public void StartMachineThread() {
-            _debugService = Services.GetService<DebugService>();
-            _storageService = Services.GetService<StorageService>();
-
-            DebugMessage( "Starting machine" );
-            State = MachineState.Starting;
-            MachineThread.Start();
-        }
-
-        public void Pause() {
-            if (State != MachineState.Running) return;
-
-            DebugMessage( "Pausing machine" );
-            State = MachineState.Pausing;
-
-            if (! IsInMachineThread()) {
-                DebugMessage( "waiting for Machine to signal Paused" );
-                _pausedEvent.WaitOne();
-                DebugMessage( "machine signaled Paused" );
-            }
-        }
-
-        public void Unpause() {
-            // Machine starts Stopped, so make sure we can issue the initializing Unpause
-            if (State != MachineState.Paused && State != MachineState.Stopped) {
-                DebugMessage( "Unpause skipped (not in Paused or Stopped)" );
-                return;
-            } else {
-                DebugMessage( "signal Unpaused" );
-                _unpausedEvent.Set();
-            }
-        }
-
-        public void StopMachineThread() {
-            if (State == MachineState.Stopped) return;
-
-            DebugMessage( "Stopping machine" );
-            State = MachineState.Stopping;
-
-            // machine might be paused, waiting to be unpaused
-            _unpausedEvent.Set();
-
-            // true if this thread has been started and has not terminated normally or aborted; otherwise, false.
-            if (MachineThread.IsAlive) {
-                // Blocks the calling thread until the thread represented by this instance terminates, while continuing to perform standard COM and SendMessage pumping.
-                MachineThread.Join();
-            }
-            State = MachineState.Stopped;
-            DebugMessage( "Stopped machine" );
-        }
-
-        public bool IsInMachineThread() {
-            return Thread.CurrentThread == MachineThread;
-        }
-
         private void RunMachineThread() {
-            Initialize();
-            Reset();
+            //Initialize( null );
+
+            //Task taskA = new Task( () => {
+            //    Thread.CurrentThread.SetApartmentState( ApartmentState.MTA );
+            //    Initialize( null );
+            //} );
+            //taskA.Start();
+            //taskA.Wait();
+
+            //Reset( null );
 
             // load last state by default, see SaveState below
             //LoadState();
@@ -312,7 +267,7 @@ namespace Jellyfish.Virtu {
 
             // by default save the current state (see LoadState above)
             // SaveState();
-            Uninitialize();
+            Uninitialize( null );
 
             // indiscriminately set events to release anyone still listening
             _unpausedEvent.Set();

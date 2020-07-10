@@ -12,12 +12,5 @@ namespace Jellyfish.Virtu {
         public MainPage GetMainPage() {
             return _mainPage;
         }
-
-        protected override void OnClosing( System.ComponentModel.CancelEventArgs e ) {
-            //do my stuff before closing
-            _mainPage.Machine.StopMachineThread();
-
-            base.OnClosing( e );
-        }
     }
 }

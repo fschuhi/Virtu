@@ -101,9 +101,11 @@ namespace Jellyfish.Virtu.Services {
             } else if (alt && (e.SystemKey == Key.F)) {
                 Machine.Video.IsFullScreen ^= true;
             } else if (alt && (e.SystemKey == Key.P)) {
-                Machine.Pause();
+                //Machine.Pause();
+                Debug.Assert( false, "Machine.Pause() not supported anymore" );
             } else if (alt && (e.SystemKey == Key.U)) {
-                Machine.Unpause();
+                //Machine.Unpause();
+                Debug.Assert( false, "Machine.Unpause() not supported anymore" );
             }
 
             Update();
