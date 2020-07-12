@@ -101,15 +101,13 @@ namespace Jellyfish.Virtu
             return 0;
         }
 
-        public void HandleEvents(int delta)
-        {
+        public void HandleEvents( int delta ) {
             var node = _used.First;
             node.Value.Delta -= delta;
 
-            while (node.Value.Delta <= 0)
-            {
+            while (node.Value.Delta <= 0) {
                 node.Value.Action();
-                RemoveEvent(node);
+                RemoveEvent( node );
                 node = _used.First;
             }
         }

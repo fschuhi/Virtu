@@ -34,7 +34,6 @@ namespace Jellyfish.Virtu.Services
 
         public override void SetFullScreen(bool isFullScreen) // agnostic
         {
-            // Debug.Assert(Thread.CurrentThread.Name == "ShowDialog" || Thread.CurrentThread.Name == "Machine");
             if (_isFullScreen != isFullScreen)
             {
                 _isFullScreen = isFullScreen;
@@ -42,9 +41,6 @@ namespace Jellyfish.Virtu.Services
                 // uses DispatcherExtensions
                 _page.Dispatcher.Send(() =>
                 {
-                    // Send() injects the Action into the WPF thread
-                    // Debug.Assert(Thread.CurrentThread.Name == "ShowDialog");
-
                     var window = Window.GetWindow(_page);
                     if (_isFullScreen)
                     {
@@ -64,8 +60,6 @@ namespace Jellyfish.Virtu.Services
 
         public override void SetPixel(int x, int y, uint color) // from Machine
         {
-            // Debug.Assert(Thread.CurrentThread.Name == "Machine");
-
             // each line as 560 pixels
             _pixels[y * BitmapWidth + x] = color;
             _pixelsDirty = true;
@@ -73,17 +67,14 @@ namespace Jellyfish.Virtu.Services
 
         public override void Update() // from ShowDialog
         {
-            // Debug.Assert(Thread.CurrentThread.Name == "ShowDialog");
-            if (_pixelsDirty)
-            {
+            if (_pixelsDirty) {
                 _pixelsDirty = false;
-                _bitmap.WritePixels(BitmapRect, _pixels, BitmapStride, 0);
+                _bitmap.WritePixels( BitmapRect, _pixels, BitmapStride, 0 );
             }
         }
 
         private void SetImageSize() // from ShowDialog
         {
-            // Debug.Assert(Thread.CurrentThread.Name == "ShowDialog");
             int uniformScale = Math.Max(1, Math.Min((int)_page.RenderSize.Width / BitmapWidth, (int)_page.RenderSize.Height / BitmapHeight));
             _image.Width = uniformScale * BitmapWidth;
             _image.Height = uniformScale * BitmapHeight;
@@ -91,7 +82,6 @@ namespace Jellyfish.Virtu.Services
 
         private void SetWindowSizeToContent() // from ShowDialog
         {
-            // Debug.Assert(Thread.CurrentThread.Name == "ShowDialog");
             if (!_sizedToContent)
             {
                 _sizedToContent = true;
