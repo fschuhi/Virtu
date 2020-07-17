@@ -1,11 +1,22 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO;
 using System.Text;
 
 namespace Jellyfish.Virtu {
+
+    public delegate void OnOpcodeEvent( Cpu cpu );
+
     public sealed partial class Cpu : MachineComponent {
+
+        public OnOpcodeEvent OnJSR;
+        public OnOpcodeEvent OnRTS;
+        public OnOpcodeEvent OnPH;
+        public OnOpcodeEvent OnPL;
+        public OnOpcodeEvent OnTXS;
+
         public Cpu( Machine machine ) :
             base( machine ) {
             ExecuteOpCode65N02 = new Action[OpCodeCount]
@@ -222,6 +233,7 @@ namespace Jellyfish.Virtu {
         // called from Events.HandleEvents
         public int Execute() {
             CC = 0;
+            OpcodeRPC = RPC;
             OpCode = _memory.ReadOpcode( RPC );
             Profiler[OpCode]++;
 
@@ -766,6 +778,7 @@ namespace Jellyfish.Virtu {
             Push( rpc >> 8 );
             Push( rpc & 0xFF );
             CC += cc;
+            OnJSR?.Invoke( this );
         }
 
         private void ExecuteLda( int data, int cc ) {
@@ -834,44 +847,52 @@ namespace Jellyfish.Virtu {
         private void ExecutePha( int cc ) {
             Push( RA );
             CC += cc;
+            OnPH?.Invoke( this );
         }
 
         private void ExecutePhp( int cc ) {
             Push( RP ); // [4-18]
             CC += cc;
+            OnPH?.Invoke( this );
         }
 
         private void ExecutePhx( int cc ) {
             Push( RX );
             CC += cc;
+            OnPH?.Invoke( this );
         }
 
         private void ExecutePhy( int cc ) {
             Push( RY );
             CC += cc;
+            OnPH?.Invoke( this );
         }
 
         private void ExecutePla( int cc ) {
             RA = Pull();
             RP = RP & ~(PN | PZ) | DataPNZ[RA];
             CC += cc;
+            OnPL?.Invoke( this );
         }
 
         private void ExecutePlp( int cc ) {
             RP = Pull();
             CC += cc;
+            OnPL?.Invoke( this );
         }
 
         private void ExecutePlx( int cc ) {
             RX = Pull();
             RP = RP & ~(PN | PZ) | DataPNZ[RX];
             CC += cc;
+            OnPL?.Invoke( this );
         }
 
         private void ExecutePly( int cc ) {
             RY = Pull();
             RP = RP & ~(PN | PZ) | DataPNZ[RY];
             CC += cc;
+            OnPL?.Invoke( this );
         }
 
         private int ExecuteRol( int data, int cc ) {
@@ -921,6 +942,7 @@ namespace Jellyfish.Virtu {
             int rpc = Pull();
             RPC = (rpc + 1 + (Pull() << 8)) & 0xFFFF;
             CC += cc;
+            OnRTS?.Invoke( this );
         }
 
         private void ExecuteSbc65N02( int data, int cc ) {
@@ -1048,6 +1070,7 @@ namespace Jellyfish.Virtu {
         private void ExecuteTxs( int cc ) {
             RS = RX;
             CC += cc;
+            OnTXS?.Invoke( this );
         }
 
         private void ExecuteTya( int cc ) {
@@ -3160,5 +3183,7 @@ namespace Jellyfish.Virtu {
 
         private bool _is65C02;
         private Action[] _executeOpCode;
+
+        public int OpcodeRPC { get; private set; }
     }
 }
