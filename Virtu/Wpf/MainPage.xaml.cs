@@ -48,12 +48,9 @@ namespace Jellyfish.Virtu {
             _memoryButton.Click += ( sender, e ) => OnMemoryButtonClick();
         }
 
-        public void OnPause() {
-            _state.Text = string.Format( CultureInfo.InvariantCulture, "paused @ PC ${0:X4}", Machine.Cpu.RPC );
-        }
-
-        public void OnUnpause() {
-            _state.Text = "running";
+        public string StateText {
+            get { return StateText; }
+            set { _state.Text = value; }
         }
 
         public void Dispose() {

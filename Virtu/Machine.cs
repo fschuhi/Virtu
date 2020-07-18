@@ -237,7 +237,7 @@ namespace Jellyfish.Virtu {
                     State = MachineState.Paused;
                     _pausedEvent.Set();
                     DebugMessage( "machine Paused" );
-                     MainPage.Dispatcher.Send( () => MainPage.OnPause() );
+                    //MainPage.Dispatcher.Send( () => MainPage.OnPause() );
 
                     // SaveState( "bla.bin " );
 
@@ -246,8 +246,8 @@ namespace Jellyfish.Virtu {
                     // to continue, either Unpause() or Stop()
                     _unpausedEvent.WaitOne();
                     _pausedEvent.Reset();
-                    if (State != MachineState.Stopping)
-                        MainPage.Dispatcher.Send( () => MainPage.OnUnpause() );
+                    //if (State != MachineState.Stopping)
+                    //    MainPage.Dispatcher.Send( () => MainPage.OnUnpause() );
 
                     DebugMessage( "machine unpaused" );
 

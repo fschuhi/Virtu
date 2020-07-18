@@ -111,7 +111,7 @@ namespace Jellyfish.Virtu
             }
 
             if (sectorsDone != 0xFFFF)
-                throw new InvalidOperationException("disk error"); // TODO: we should alert the user and "dump" a NIB
+                throw new InvalidOperationException("disk error"); // we should alert the user and "dump" a NIB
         }
 
         private byte ReadNibble()
@@ -152,7 +152,7 @@ namespace Jellyfish.Virtu
         private byte ReadTranslatedNibble()
         {
             byte data = NibbleToByte[ReadNibble()];
-            // TODO: check that invalid nibbles aren't used
+            // needs: check that invalid nibbles aren't used
             // (put 0xFFs for invalid nibbles in the table)
             //if (data == 0xFF)
             //{

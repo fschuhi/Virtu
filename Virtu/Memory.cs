@@ -322,7 +322,8 @@ namespace Jellyfish.Virtu
             if (address >= 0xC000 && address < 0xD000)
             {
                 // avoid side-effects
-                return 0; // TODO: return C100...CFFF
+                // needs: return C100...CFFF
+                return 0; 
             }
 
             return ReadBanked(address);
