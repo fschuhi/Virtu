@@ -3166,16 +3166,16 @@ namespace Jellyfish.Virtu {
         public bool IsThrottled { get; set; }
         public int Multiplier { get; set; }
 
-        public int RA { get; private set; }
-        public int RX { get; private set; }
-        public int RY { get; private set; }
-        public int RS { get; private set; }
-        public int RP { get; private set; }
-        public int RPC { get; private set; }
+        public int RA { get; set; }
+        public int RX { get; set; }
+        public int RY { get; set; }
+        public int RS { get; set; }
+        public int RP { get; set; }
+        public int RPC { get; set; }
         public int EA { get; private set; }
         public int CC { get; private set; }
         public int OpCode { get; private set; }
-        public long Cycles { get; private set; }
+        public long Cycles { get; set; }
 
         public long[] Profiler = new long[OpCodeCount];
 
