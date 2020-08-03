@@ -11,6 +11,22 @@ using Microsoft.Win32;
 
 namespace Jellyfish.Virtu {
     public sealed partial class MainPage : UserControl, IDisposable {
+
+        public Window MainWindow { get { return Window.GetWindow( this ); } }
+        public Machine Machine { get; set; }
+
+        public DebugService _debugService;
+        public StorageService _storageService;
+        public KeyboardService _keyboardService;
+        public GamePortService _gamePortService;
+        public AudioService _audioService;
+        public VideoService _videoService;
+
+        private long _lastCycles;
+        private long _lastTime;
+
+        public MemoryWindow _memoryWindow;
+
         public MainPage() {
             InitializeComponent();
 
@@ -93,19 +109,8 @@ namespace Jellyfish.Virtu {
             }
         }
 
-        public Window MainWindow { get { return Window.GetWindow( this ); } }
-        public Machine Machine { get; set; }
-
-        public DebugService _debugService;
-        public StorageService _storageService;
-        public KeyboardService _keyboardService;
-        public GamePortService _gamePortService;
-        public AudioService _audioService;
-        public VideoService _videoService;
-
-        private long _lastCycles;
-        private long _lastTime;
-
-        public MemoryWindow _memoryWindow;
+        private void _asmButton_Click( object sender, RoutedEventArgs e ) {
+            MessageBox.Show( "yes!" );
+        }
     }
 }
