@@ -42,9 +42,6 @@ namespace Jellyfish.Virtu {
             Components = new Collection<MachineComponent> { Cpu, Memory, Keyboard, GamePort, Cassette, Speaker, Video, NoSlotClock, Slot1, Slot2, Slot3, Slot4, Slot5, Slot6, Slot7 };
 
             BootDiskII = Slots.OfType<DiskIIController>().Last();
-
-            MachineThread = new Thread( RunMachineThread ) { Name = "Machine" };
-            MachineThread.IsBackground = true;
         }
 
         public void Dispose() {
@@ -176,104 +173,6 @@ namespace Jellyfish.Virtu {
                 component.Reset();
                 //DebugMessage("Reset machine '{0}'", component.GetType().Name);
             }
-        }
-
-        private void RunMachineThread() {
-            //Initialize( null );
-
-            //Task taskA = new Task( () => {
-            //    Thread.CurrentThread.SetApartmentState( ApartmentState.MTA );
-            //    Initialize( null );
-            //} );
-            //taskA.Start();
-            //taskA.Wait();
-
-            //Reset( null );
-
-            // load last state by default, see SaveState below
-            //LoadState();
-            //LoadState( "bla.bin " );
-
-            DebugMessage( "initialized, reset, loaded state" );
-            // we don't start execution of 6502 code right away
-            State = MachineState.Paused;
-            _pausedEvent.Set();
-
-            // we can use the Paused state to load a different state, or insert boot disk, then set breakpoints etc.
-
-            // IMPORTANT: Machine must be unpaused manually
-            _unpausedEvent.WaitOne();
-            _pausedEvent.Reset();
-
-            // we are now officially running
-            State = MachineState.Running;
-            DebugMessage( "machine running (in RunMachineThread)" );
-
-            bool isBreakpointAtRPC = false;
-
-            do {
-                do {
-                    if (isBreakpointAtRPC) {
-                        // do not break yet again on the same RPC
-                        DebugMessage( "maching skipping handled breakpoint" );
-                        isBreakpointAtRPC = false;
-                        Events.HandleEvents( Cpu.Execute() );
-                    } else {
-                        if (Memory.DebugInfo[Cpu.RPC].Flags.HasFlag( DebugFlags.Breakpoint )) {
-                            DebugMessage( "machine encountered breakpoint" );
-                            // it's a breakpoint, so pause the machine
-                            isBreakpointAtRPC = true;
-                            State = MachineState.Pausing;
-                        } else {
-                            Events.HandleEvents( Cpu.Execute() );
-                        }
-                    }
-                }
-                while (State == MachineState.Running);
-
-                if (State == MachineState.Pausing) {
-
-                    // signal that we have reached Paused state
-                    State = MachineState.Paused;
-                    _pausedEvent.Set();
-                    DebugMessage( "machine Paused" );
-                    //MainPage.Dispatcher.Send( () => MainPage.OnPause() );
-
-                    // SaveState( "bla.bin " );
-
-                    DebugMessage( "machine now waiting for Unpause" );
-
-                    // to continue, either Unpause() or Stop()
-                    _unpausedEvent.WaitOne();
-                    _pausedEvent.Reset();
-                    //if (State != MachineState.Stopping)
-                    //    MainPage.Dispatcher.Send( () => MainPage.OnUnpause() );
-
-                    DebugMessage( "machine unpaused" );
-
-                    // stopping of the machine can also be triggered while being paused
-                    // in this case we must not transition to Running
-                    if (State != MachineState.Stopping) {
-
-                        // was Unpause(), so it's safe to continue execution
-                        State = MachineState.Running;
-                    }
-
-                }
-            }
-            while (State != MachineState.Stopping);
-
-            DebugMessage( "machine has exited main Cpu.Execute loop, saving state" );
-
-            // by default save the current state (see LoadState above)
-            // SaveState();
-            Uninitialize( null );
-
-            // indiscriminately set events to release anyone still listening
-            _unpausedEvent.Set();
-            _pausedEvent.Set();
-
-            DebugMessage( "machine exits RunMachineThread" );
         }
 
         public const string Version = "0.9.4.0";
