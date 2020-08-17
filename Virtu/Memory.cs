@@ -1744,6 +1744,8 @@ namespace Jellyfish.Virtu
             _ramMainRegion02BF[0x03F4 - 0x0200] = (byte)((address >> 8) ^ 0xA5);
         }
 
+        #region bits, masks, states
+
         private static int SetBit7(int data, bool value)
         {
             return value ? (data | 0x80) : (data & 0x7F);
@@ -1795,6 +1797,7 @@ namespace Jellyfish.Virtu
         {
             return ((_state & mask) == value);
         }
+        #endregion
 
         public bool Is80Columns { get { return TestState(State80Col); } }
         public bool Is80Store { get { return TestState(State80Store); } }

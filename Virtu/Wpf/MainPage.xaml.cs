@@ -27,6 +27,8 @@ namespace Jellyfish.Virtu {
 
         public MemoryWindow _memoryWindow;
 
+        public Action AsmAction;
+
         public MainPage() {
             InitializeComponent();
 
@@ -110,7 +112,9 @@ namespace Jellyfish.Virtu {
         }
 
         private void _asmButton_Click( object sender, RoutedEventArgs e ) {
-            MessageBox.Show( "yes!" );
+            //MessageBox.Show( "yes!" );
+            AsmAction();
         }
+
     }
 }
