@@ -9,69 +9,12 @@ using Jellyfish.Virtu.Services;
 
 namespace Jellyfish.Virtu {
 
-    public enum RecordedOperationType { Read, Write }
-
-    public class RecordedOperation {
-        public long Cycles { get; set; }
-        public RecordedOperationType Type { get; set; }
-        public long OpcodeRPC { get; set; }
-        public long Address { get; set; }
-        public int Value { get; set; }
-        public int OldValue { get; set; }
-        public int RPC { get; set; }
-        public int RA { get; set; }
-        public int RX { get; set; }
-        public int RY { get; set; }
-        public int RP { get; set; }
-        public int RS { get; set; }
-    }
-
-    public class RecordedOperations {
-
-        public List<RecordedOperation> Operations = new List<RecordedOperation>();
-        Cpu _cpu;
-
-        public RecordedOperations( Machine machine ) {
-            _cpu = machine.Cpu;
-        }
-
-        public void Read( int address, int value ) {
-            Operations.Add( new RecordedOperation() {
-                Cycles = _cpu.Cycles,
-                Type = RecordedOperationType.Read,
-                Address = address,
-                Value = value,
-                OpcodeRPC = _cpu.OpcodeRPC,
-                RPC = _cpu.RPC,
-                RA = _cpu.RA,
-                RX = _cpu.RX,
-                RY = _cpu.RY,
-                RP = _cpu.RP,
-                RS = _cpu.RS,
-            } );
-        }
-
-        public void Write( int address, int oldValue, int newValue ) {
-            Operations.Add( new RecordedOperation() {
-                Cycles = _cpu.Cycles,
-                Type = RecordedOperationType.Write,
-                OpcodeRPC = _cpu.OpcodeRPC,
-                Address = address,
-                Value = newValue,
-                OldValue = oldValue,
-                RPC = _cpu.RPC,
-                RA = _cpu.RA,
-                RX = _cpu.RX,
-                RY = _cpu.RY,
-                RP = _cpu.RP,
-                RS = _cpu.RS,
-            } );
-
-            // TODO: hier delegates (oder events? nochmal das GC Thema suchen), RecordedOperations -> Workbench
-            // TODO: track opcodes (R..., auch OpcodeRPC und Cycles)
-            // TODO: breakpoint @ cycles => MessageBox in regelmäßigen Abständen, damit wir uns nicht totsammeln
-        }
-    }
+    public delegate void OnReadEvent( int address, int value );
+    public delegate void OnReadZeroPageEvent( int address, int value );
+    public delegate void OnReadOpcodeEvent( int address, int opcode );
+    public delegate void OnReadOperandEvent( int address, int operand );
+    public delegate void OnWriteEvent( int address, int newValue, int oldValue );
+    public delegate void OnWriteZeroPageEvent( int address, int newValue, int oldValue );
 
     public enum MonitorType { Unknown, Standard, Enhanced };
 
@@ -96,12 +39,15 @@ namespace Jellyfish.Virtu {
 
     public partial class Memory : MachineComponent {
 
-        public RecordedOperations RecordedOperations;
+        public OnReadEvent OnRead;
+        public OnReadZeroPageEvent OnReadZeroPage;
+        public OnReadOpcodeEvent OnReadOpcode;
+        public OnReadOperandEvent OnReadOperand;
+        public OnWriteEvent OnWrite;
+        public OnWriteZeroPageEvent OnWriteZeroPage;
 
         public Memory( Machine machine ) :
             base( machine ) {
-
-            RecordedOperations = new RecordedOperations( machine );
 
             WriteRamModeBankRegion = new Action<int, byte>[Video.ModeCount][][];
             for (int mode = 0; mode < Video.ModeCount; mode++) {
@@ -318,14 +264,13 @@ namespace Jellyfish.Virtu {
         public int Read( int address ) {
             ReadUpdateDatum( address );
             int value = ReadBanked( address );
-            RecordedOperations.Read( address, value );
+            OnRead?.Invoke( address, value );
             return value;
         }
 
         public int ReadBanked( int address ) {
             int region = PageRegion[address >> 8];
-            int value = ((address & 0xF000) != 0xC000) ? _regionRead[region][address - RegionBaseAddress[region]] : ReadIoRegionC0CF( address );
-            return value;
+            return ((address & 0xF000) != 0xC000) ? _regionRead[region][address - RegionBaseAddress[region]] : ReadIoRegionC0CF( address );
         }
 
         public int ReadOpcode( int address ) {
@@ -340,7 +285,9 @@ namespace Jellyfish.Virtu {
             //if (DebugInfo[address].Flags.HasFlag(DebugFlags.Breakpoint))
             //    Machine.Pause();
 
-            return ReadBanked( address );
+            int opcode = ReadBanked( address );
+            OnReadOpcode?.Invoke( address, opcode );
+            return opcode;
         }
 
         public void ClearBreakpoint( int address ) {
@@ -358,7 +305,9 @@ namespace Jellyfish.Virtu {
             DebugInfo[address].LastExecCycle = Machine.Cpu.Cycles;
             DebugInfo[address].Flags &= ~DebugFlags.Opcode;
 
-            return ReadBanked( address );
+            int operand = ReadBanked( address );
+            OnReadOperand?.Invoke( address, operand );
+            return operand;
         }
 
         public int ReadDebug( int address ) {
@@ -374,7 +323,7 @@ namespace Jellyfish.Virtu {
         public int ReadZeroPage( int address ) {
             ReadUpdateDatum( address );
             int value = _zeroPage[address];
-            RecordedOperations.Read( address, value );
+            OnReadZeroPage?.Invoke( address, value );
             return value;
         }
 
@@ -396,10 +345,7 @@ namespace Jellyfish.Virtu {
 
         public void Write( int address, int data ) {
             WriteUpdateDatum( address );
-
-            int oldValue = ReadDebug( address );
-            RecordedOperations.Write( address, oldValue, data );
-
+            OnWrite?.Invoke( address, data, ReadDebug( address ) );
             int region = PageRegion[address >> 8];
             if (_writeRegion[region] == null) {
                 _regionWrite[region][address - RegionBaseAddress[region]] = (byte)data;
@@ -410,10 +356,7 @@ namespace Jellyfish.Virtu {
 
         public void WriteZeroPage( int address, int data ) {
             WriteUpdateDatum( address );
-
-            int oldValue = _zeroPage[address];
-            RecordedOperations.Write( address, oldValue, data );
-
+            OnWriteZeroPage?.Invoke( address, data, _zeroPage[address] );
             _zeroPage[address] = (byte)data;
         }
         #endregion

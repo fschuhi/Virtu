@@ -20,6 +20,8 @@ namespace Jellyfish.Virtu {
         public OnOpcodeEvent OnPL;
         public OnOpcodeEvent OnTXS;
 
+        public OnOpcodeEvent OnExecuted;
+
         public Cpu( Machine machine ) :
             base( machine ) {
             ExecuteOpCode65N02 = new Action[OpCodeCount]
@@ -250,6 +252,8 @@ namespace Jellyfish.Virtu {
             RPC = (RPC + 1) & 0xFFFF;
             _executeOpCode[OpCode]();
             Cycles += CC;
+
+            OnExecuted?.Invoke( this );
 
             //System.Diagnostics.Debug.WriteLine("      " + ToString());
 
