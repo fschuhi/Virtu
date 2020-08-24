@@ -11,14 +11,14 @@ namespace Jellyfish.Virtu
 
         // processor status Pflags: NVBRDIZC, BR usually set
 
-        private const int PC = 0x01;
-        private const int PZ = 0x02;
-        private const int PI = 0x04;
-        private const int PD = 0x08;
-        private const int PB = 0x10;
-        private const int PR = 0x20;
-        private const int PV = 0x40;
-        private const int PN = 0x80;
+        public const int PC = 0x01;
+        public const int PZ = 0x02;
+        public const int PI = 0x04;
+        public const int PD = 0x08;
+        public const int PB = 0x10;
+        public const int PR = 0x20;
+        public const int PV = 0x40;
+        public const int PN = 0x80;
 
         private const int DataCount = 256;
 
